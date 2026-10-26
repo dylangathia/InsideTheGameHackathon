@@ -31,3 +31,4 @@ The rules say the video must be **under 2 minutes** (judges can stop at 2:00), m
 - AI text appears about a second after the template text, so pause briefly before moving on.
 - If the agent answer is slow, cut the wait out in editing.
 - Rehearse once with a timer. If you're over 1:55, shorten the player-focus segment first.
+- Optional, only if there's time to spare: 5 seconds of `docs/media/auto-eventing.mp4` (computer vision detecting a 7-pass move and the goal) with the line "we even recover events from video, and measure the accuracy against the truth". Never at the expense of the agents or the split screen.

@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> None:
     rp.add_argument("--metric", default="speed")
     rp.add_argument("--all", action="store_true", help="include non-key overlays")
     ae = sub.add_parser("autoevent", help="computer vision over a rendered video feed, scored against the truth")
-    ae.add_argument("--out", default="../docs/auto-eventing.md")
+    ae.add_argument("--out", default="../docs/auto-eventing.md", help="use another path for quick test runs")
     ae.add_argument("--clip", default="../docs/media/auto-eventing.mp4")
     ae.add_argument("--seconds", type=float, default=300.0, help="length of each match window")
     ev = sub.add_parser("evaluate", help="run every key moment through the Narrator and Verifier agents")
