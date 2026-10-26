@@ -9,7 +9,7 @@ export interface FrameBuffer {
   at: number; // performance.now() when cur arrived
 }
 
-const emptyViewer = (): ViewerData => ({ overlays: [], answers: [] });
+const emptyViewer = (): ViewerData => ({ overlays: [], answers: [], desk: [] });
 
 /** One WebSocket per scenario: shared clock, frames and state, plus per-viewer overlays. */
 export function useMatchStream(scenario: string, viewers: Profile[], initialSpeed: number) {
@@ -73,6 +73,12 @@ export function useMatchStream(scenario: string, viewers: Profile[], initialSpee
           break;
         case "history":
           setViews((vs) => updateViewer(vs, msg.viewer, (v) => ({ ...v, overlays: msg.overlays as Overlay[] })));
+          break;
+        case "agent":
+          setViews((vs) => updateViewer(vs, msg.viewer, (v) => ({
+            ...v,
+            desk: [...v.desk, { ...msg.event, receivedAt: performance.now() }].slice(-40),
+          })));
           break;
         case "answer":
           setViews((vs) => updateViewer(vs, msg.viewer, (v) => ({

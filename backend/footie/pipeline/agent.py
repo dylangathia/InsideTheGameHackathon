@@ -265,7 +265,7 @@ def _step_label(name: str, args: dict) -> str:
     return f"{name}({shown})"
 
 
-async def ask_agent(llm, question: str, session, profile, max_steps: int = 5) -> dict:
+async def ask_agent(llm, question: str, session, profile, max_steps: int = 5, on_step=None) -> dict:
     """Run the tool loop. Returns {answer, cites, steps, source}."""
     tools = MatchTools(session)
     persona = PERSONAS.get(profile.mode, PERSONAS["casual"]).format(
@@ -276,6 +276,11 @@ async def ask_agent(llm, question: str, session, profile, max_steps: int = 5) ->
     if orchestration.enabled(llm):
         def call_tool(name: str, args: dict) -> dict:
             steps.append(_step_label(name, args))
+            if on_step:
+                try:
+                    on_step("analyst", "looked up", _step_label(name, args))
+                except Exception as exc:  # the desk is a display; it must never break a tool call
+                    log.warning("agent desk update failed: %s", exc)
             return tools.run(name, args)
 
         text = await orchestration.run_match_analyst(llm, system, question, TOOLS, call_tool, max_steps)
@@ -299,6 +304,8 @@ async def ask_agent(llm, question: str, session, profile, max_steps: int = 5) ->
                 args = {}
             result = tools.run(call["name"], args)
             steps.append(_step_label(call["name"], args))
+            if on_step:
+                on_step("analyst", "looked up", steps[-1])
             messages.append({"role": "tool", "tool_call_id": call["id"],
                              "content": json.dumps(result, ensure_ascii=False)})
     else:

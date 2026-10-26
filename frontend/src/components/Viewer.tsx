@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { FrameBuffer } from "../useMatchStream";
-import type { Answer, Frame, MatchState, Meta, Mode, Overlay, Profile } from "../types";
+import type { AgentEvent, Answer, Frame, MatchState, Meta, Mode, Overlay, Profile } from "../types";
 import { LANGUAGES, LLM_LANGUAGES, METRICS, MODES } from "../types";
+import { AgentDesk } from "./AgentDesk";
 import { Feed, Indices, MetricTracker, Momentum, PlayerCard, StatsTable, WinChance, WinProbChart } from "./Panels";
 import { Stage } from "./Stage";
 
@@ -14,6 +15,7 @@ interface Props {
   frames: React.MutableRefObject<FrameBuffer>;
   overlays: Overlay[];
   answers: Answer[];
+  desk: AgentEvent[];
   profile: Profile;
   onProfile: (p: Profile) => void;
   onReplay: (t: number) => void;
@@ -148,6 +150,7 @@ export function Viewer(props: Props) {
             onReplay={props.onReplay}
           />
         );
+        const desk = meta.llm ? <AgentDesk events={props.desk} framework={!!meta.agent_framework} /> : null;
         const panels = (
           <>
             {profile.mode === "analyst" && (
@@ -179,6 +182,7 @@ export function Viewer(props: Props) {
                 {stage}
                 <aside className="rail">
                   {feed}
+                  {desk}
                   {ask}
                 </aside>
               </div>
@@ -192,6 +196,7 @@ export function Viewer(props: Props) {
             <div className={`panels panels-${profile.mode}`}>
               {panels}
               {feed}
+              {desk}
               {ask}
             </div>
           </>

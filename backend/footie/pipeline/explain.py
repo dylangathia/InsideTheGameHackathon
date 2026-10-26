@@ -422,11 +422,34 @@ class Narrator:
         return (ctx.team("home"), ctx.team("away"), ins["id"], ins["t"], ins["kind"],
                 profile.mode, profile.language, profile.club, profile.player, profile.metric)
 
-    async def rewrite(self, ins: dict, profile, ctx: NameContext, draft: dict) -> dict | None:
-        """Narrator agent writes, Verifier agent checks; one rewrite on failure, else keep the template."""
+    async def rewrite(self, ins: dict, profile, ctx: NameContext, draft: dict, on_step=None) -> dict | None:
+        """Narrator agent writes, Verifier agent checks; one rewrite on failure, else keep the template.
+
+        on_step(agent, action, detail) is called as each agent acts, for the live agent desk.
+        """
         key = self.cache_key(ins, profile, ctx)
         if key in self.cache:
             return self.cache[key]
+        moment = f"{ins['minute']} {ins['kind'].replace('_', ' ')}"
+        attempts = 0
+
+        def emit(agent: str, action: str, detail: str = "") -> None:
+            if on_step:
+                on_step(agent, action, detail)
+
+        async def write(p: dict) -> dict | None:
+            nonlocal attempts
+            attempts += 1
+            out = await self._write(ins, profile, ctx, p)
+            if out:
+                emit("narrator", "drafted" if attempts == 1 else "rewrote", f"{moment}: “{out.get('headline', '')}”")
+            return out
+
+        async def verify(out: dict) -> list[str]:
+            problems = await self.check(ins, profile, ctx, out, payload, draft)
+            emit("verifier", "flagged" if problems else "passed", problems[0] if problems else moment)
+            return problems
+
         en_reasons = [tr("en", c, **p) for c, p in reasons(ins, ctx)]
         payload = {
             "moment": ins["kind"],
@@ -442,8 +465,8 @@ class Narrator:
             # Microsoft Agent Framework workflow: narrator -> verifier, one rewrite on failure.
             outcome = await orchestration.narrate_and_verify(
                 payload,
-                lambda p: self._write(ins, profile, ctx, p),
-                lambda out: self.check(ins, profile, ctx, out, payload, draft),
+                write,
+                verify,
             )
             if outcome.status == "failed":
                 return None
@@ -455,6 +478,7 @@ class Narrator:
                 self.stats["rejected"] += 1
                 self.rejections.append({"insight": ins["id"], "language": profile.language, "key": key,
                                         "draft": outcome.out, "problems": outcome.problems, "second": outcome.second})
+                emit("verifier", "rejected", f"{moment}: failed twice, the template text stays")
                 return None  # the template text stays on screen
             out = outcome.out
             verification = {"status": outcome.status, "orchestrator": "Microsoft Agent Framework"}
@@ -464,20 +488,20 @@ class Narrator:
                       "verification": verification}
             self.cache[key] = result
             return result
-        out = await self._write(ins, profile, ctx, payload)
+        out = await write(payload)
         if out is None:
             return None
         verification = {"status": "unchecked"}
         if self.verify:
-            problems = await self.check(ins, profile, ctx, out, payload, draft)
+            problems = await verify(out)
             self.stats["checked"] += 1
             if problems:
                 self.stats["failed_first"] += 1
                 log.info("Verifier rejected %s (%s): %s", ins["id"], profile.language, problems)
-                retry = await self._write(ins, profile, ctx, {**payload, "rejected_draft": out,
-                                                              "fix_these_problems": problems})
-                second = await self.check(ins, profile, ctx, retry, payload, draft) if retry else ["no rewrite"]
+                retry = await write({**payload, "rejected_draft": out, "fix_these_problems": problems})
+                second = await verify(retry) if retry else ["no rewrite"]
                 if second:
+                    emit("verifier", "rejected", f"{moment}: failed twice, the template text stays")
                     self.stats["rejected"] += 1
                     self.rejections.append({"insight": ins["id"], "language": profile.language, "key": key,
                                             "draft": out, "problems": problems, "second": second})

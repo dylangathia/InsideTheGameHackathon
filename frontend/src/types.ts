@@ -217,6 +217,17 @@ export interface Status {
 export interface ViewerData {
   overlays: Overlay[];
   answers: Answer[];
+  desk: AgentEvent[];
+}
+
+/** One step by one agent, streamed live for the agent desk. */
+export interface AgentEvent {
+  seq: number;
+  agent: "narrator" | "verifier" | "analyst" | "pundit";
+  action: string; // drafted, rewrote, passed, flagged, rejected, looked up, answered, presenting...
+  detail: string;
+  minute: string;
+  receivedAt?: number;
 }
 
 export const LANGUAGES: Record<string, string> = {

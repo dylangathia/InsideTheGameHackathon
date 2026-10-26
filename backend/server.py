@@ -128,6 +128,7 @@ class Connection:
         self.session: MatchSession | None = None
         self.inbox: asyncio.Queue = asyncio.Queue()
         self.tasks: set[asyncio.Task] = set()
+        self.desk_seq = 0
 
     async def send(self, msg: dict) -> None:
         async with self.lock:
@@ -150,8 +151,25 @@ class Connection:
                 if NARRATOR.wants(ins):
                     self.spawn(self.upgrade(vi, prof, ins, p))
 
+    def desk(self, vi: int):
+        """A callback the agents call as they act; each step goes to the browser's agent desk.
+
+        Agent Framework may run tools on a worker thread, so the send is handed to the event loop thread-safely.
+        """
+        loop = asyncio.get_running_loop()
+
+        def send_step(agent: str, action: str, detail: str) -> None:
+            self.desk_seq += 1
+            self.spawn(self.send({"type": "agent", "viewer": vi, "event": {
+                "seq": self.desk_seq, "agent": agent, "action": action, "detail": detail,
+                "minute": self.session.analyzer.label() if self.session else ""}}))
+
+        def on_step(agent: str, action: str, detail: str = "") -> None:
+            loop.call_soon_threadsafe(send_step, agent, action, detail)
+        return on_step
+
     async def upgrade(self, vi: int, prof: Profile, ins: dict, p: dict) -> None:
-        text = await NARRATOR.rewrite(ins, prof, self.session.ctx, p["text"])
+        text = await NARRATOR.rewrite(ins, prof, self.session.ctx, p["text"], on_step=self.desk(vi))
         if text:
             await self.send({"type": "overlay_text", "viewer": vi, "id": p["id"], "text": text})
 
@@ -199,12 +217,14 @@ class Connection:
             ans = None
             if NARRATOR.enabled:
                 try:
-                    ans = await ask_agent(NARRATOR.llm, question, self.session, prof)
+                    ans = await ask_agent(NARRATOR.llm, question, self.session, prof, on_step=self.desk(vi))
                 except Exception as exc:  # fall back to the single-shot answer below
                     log.warning("agent failed, falling back: %s", exc)
             if ans is None:
                 ans = await NARRATOR.answer(question, self.session.ask_context(prof), prof, self.session.ctx)
             await self.send({"type": "answer", "viewer": vi, "question": question, "as_of": as_of, **ans})
+            if ans.get("source") in ("agent", "agent_framework"):
+                self.desk(vi)("analyst", "answered", question)
         await self.status()
 
     async def reader(self) -> None:
