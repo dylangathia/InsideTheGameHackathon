@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FirstVisitTips, HowItWorks } from "./components/HowItWorks";
 import { Viewer } from "./components/Viewer";
 import type { Profile } from "./types";
 import { useMatchStream } from "./useMatchStream";
@@ -31,10 +32,11 @@ export default function App() {
   const { meta, state, frame, frames, status, views, send, connected } = useMatchStream(
     scenario,
     viewers,
-    Number(params.get("speed") ?? 10),
+    Number(params.get("speed") ?? 5),
   );
   const [scrub, setScrub] = useState<number | null>(null);
   const [jumped, setJumped] = useState(false);
+  const [showHow, setShowHow] = useState(false);
 
   useEffect(() => {
     const t = params.get("t");
@@ -120,6 +122,7 @@ export default function App() {
             {split ? "Single view" : "Split screen"}
           </button>
         </div>
+        <button onClick={() => setShowHow(true)}>How it works</button>
         <div className="badges">
           <span className={`badge ${connected ? "on" : "off"}`}>{connected ? "Live" : "Connecting…"}</span>
           <span className={`badge ${meta?.llm ? "on" : "off"}`} title="AI model for narration and Q&A">
@@ -159,6 +162,8 @@ export default function App() {
       </div>
 
       {meta?.scenario && <p className="scenario-desc">{meta.scenario.description}</p>}
+      <FirstVisitTips onHow={() => setShowHow(true)} />
+      {showHow && <HowItWorks onClose={() => setShowHow(false)} />}
 
       {!meta ? (
         <div className="loading">Building the match… (first run simulates and caches it, about 10 seconds)</div>

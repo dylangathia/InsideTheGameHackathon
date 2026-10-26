@@ -51,6 +51,7 @@ class LLMClient:
                     api_key=key,
                     api_version=os.getenv("AZURE_OPENAI_API_VERSION", DEFAULT_API_VERSION),
                     timeout=12.0,
+                    max_retries=4,  # ride out brief network blips
                 )
                 return cls(client, deployment, "Foundry")
             key = os.getenv("OPENAI_API_KEY")
@@ -58,14 +59,14 @@ class LLMClient:
                 from openai import AsyncOpenAI
 
                 base_url = os.getenv("OPENAI_BASE_URL") or None
-                client = AsyncOpenAI(base_url=base_url, api_key=key, timeout=12.0)
+                client = AsyncOpenAI(base_url=base_url, api_key=key, timeout=12.0, max_retries=4)
                 provider = "Groq" if base_url and "groq.com" in base_url else "OpenAI-compatible"
                 return cls(client, os.getenv("OPENAI_MODEL", "gpt-4o-mini"), provider)
         except Exception as exc:
             log.warning("LLM disabled: %s", exc)
         return None
 
-    async def complete_json(self, system: str, user: str, max_tokens: int = 300) -> dict:
+    async def complete_json(self, system: str, user: str, max_tokens: int = 300, temperature: float = 0.6) -> dict:
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         async with self.sem:
             if self.reasoning:
@@ -79,7 +80,7 @@ class LLMClient:
             try:
                 resp = await self.client.chat.completions.create(
                     model=self.model, messages=messages, response_format={"type": "json_object"},
-                    max_tokens=max_tokens, temperature=0.6,
+                    max_tokens=max_tokens, temperature=temperature,
                 )
             except Exception as exc:
                 # Reasoning-style models reject max_tokens/temperature; retry with their parameters.

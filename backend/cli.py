@@ -4,6 +4,7 @@
     python cli.py export --scenario all --out ../data [--tracking]
     python cli.py generate --home NBR --away KSU --seed 7 --out ../data
     python cli.py report --scenario comeback --mode casual --lang es [--club RVA] [--player RVA-10]
+    python cli.py evaluate        # groundedness of AI narration -> docs/evaluation.md (needs Foundry keys)
 """
 from __future__ import annotations
 
@@ -71,8 +72,22 @@ def main(argv: list[str] | None = None) -> None:
     rp.add_argument("--player")
     rp.add_argument("--metric", default="speed")
     rp.add_argument("--all", action="store_true", help="include non-key overlays")
+    ev = sub.add_parser("evaluate", help="run every key moment through the Narrator and Verifier agents")
+    ev.add_argument("--out", default="../docs/evaluation.md")
     args = ap.parse_args(argv)
 
+    if args.cmd == "evaluate":
+        from dotenv import load_dotenv
+
+        from footie.evaluation import run_evaluation
+
+        load_dotenv(Path(__file__).with_name(".env"))
+        text = run_evaluation()
+        Path(args.out).write_text(text, encoding="utf-8")
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")
+        print(text)
+        return
     if args.cmd == "scenarios":
         for s in SCENARIOS.values():
             print(f"{s.id:10} {s.title:14} {s.description}")

@@ -57,6 +57,7 @@ export interface OverlayText {
   body?: string;
   why?: string[];
   source: "template" | "llm";
+  verification?: { status: "passed" | "passed_after_rewrite" | "unchecked"; problems_fixed?: string[] };
 }
 
 export interface Overlay {

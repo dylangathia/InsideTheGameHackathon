@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AiBadge } from "./Stage";
 import type { Club, Grounding, MatchState, Overlay, PlayerStats, Side } from "../types";
 import { METRICS } from "../types";
 
@@ -222,7 +223,7 @@ function Moment({ o, onReplay }: { o: Overlay; onReplay: (t: number) => void }) 
       <div className="feed-moment-head">
         <span className="feed-min">{o.minute}</span>
         <strong>{o.text.headline}</strong>
-        {o.text.source === "llm" && <span className="ai-badge">AI</span>}
+        <AiBadge o={o} />
         <span className="feed-actions">
           {o.grounding && (
             <button className="replay" onClick={() => setOpen(!open)} aria-expanded={open} title="Show what this is based on">
@@ -240,7 +241,7 @@ function Moment({ o, onReplay }: { o: Overlay; onReplay: (t: number) => void }) 
           {w}
         </div>
       ))}
-      {open && o.grounding && <Sources g={o.grounding} ai={o.text.source === "llm"} />}
+      {open && o.grounding && <Sources g={o.grounding} ai={o.text.source === "llm"} verification={o.text.verification} />}
     </li>
   );
 }
@@ -252,6 +253,9 @@ const FACT_LABELS: Record<string, string> = {
   wp_before: "Win chance before (%)",
   wp_after: "Win chance after (%)",
   wp: "Win chance (%)",
+  win_probability_before_pct: "Win chance before (%)",
+  win_probability_after_pct: "Win chance after (%)",
+  win_probability_now_pct: "Win chance (%)",
   seq_passes: "Passes in the move",
   seq_seconds: "Move length (s)",
   seq_travel_m: "Ground gained (m)",
@@ -272,9 +276,22 @@ const FACT_LABELS: Record<string, string> = {
 const label = (k: string) => FACT_LABELS[k] ?? k.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 /** The audit trail: the exact facts and reasons the explanation (or the AI) was given, plus the raw events. */
-function Sources({ g, ai }: { g: Grounding; ai: boolean }) {
+function Sources({ g, ai, verification }: { g: Grounding; ai: boolean; verification?: Overlay["text"]["verification"] }) {
   return (
     <div className="sources">
+      {ai && verification && verification.status !== "unchecked" && (
+        <div className="verifier">
+          <strong>Verifier agent:</strong>{" "}
+          {verification.status === "passed"
+            ? "every number and claim matched the facts below."
+            : "rejected the first draft and the Narrator rewrote it. Fixed: "}
+          {verification.problems_fixed?.map((p, i) => (
+            <span key={i} className="verifier-fix">
+              {p}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="sources-head">{ai ? "What the AI was given" : "What this is based on"}</div>
       <dl className="sources-facts">
         {Object.entries(g.facts).map(([k, v]) => (

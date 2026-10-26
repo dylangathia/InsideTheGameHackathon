@@ -204,3 +204,28 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .answers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; }
 .answers .q { font-size: 12px; color: var(--muted); }
 .answers .a { font-size: 14px; }
+
+/* ---------- onboarding */
+.tips { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; }
+.tips ol { flex: 1 1 520px; margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 14px; color: #cfd8e5; }
+.tips strong { color: var(--fg); }
+.tips-actions { display: flex; gap: 8px; }
+.how-backdrop { position: fixed; inset: 0; background: rgba(5, 8, 13, 0.7); display: grid; place-items: center; padding: 16px; z-index: 50; }
+.how { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 8px; padding: 16px 20px; max-width: 720px; width: 100%; max-height: 90vh; overflow: auto; }
+.how-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.how h2, .how h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.03em; margin: 0; }
+.how h2 { font-size: 26px; }
+.how h3 { font-size: 18px; margin-top: 16px; color: var(--muted); }
+.how-stages { list-style: none; counter-reset: st; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
+.how-stages li { counter-increment: st; display: grid; grid-template-columns: 150px 1fr; gap: 10px; align-items: baseline; }
+.how-stages li strong::before { content: counter(st) "  "; color: var(--accent); font-family: var(--font-mono); }
+.how-stages strong, .how-tech strong { font-family: var(--font-display); font-size: 17px; text-transform: uppercase; }
+.how-tech { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.how-tech li { background: var(--surface-2); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: #cfd8e5; min-width: 0; }
+.how-note { color: var(--muted); font-size: 13px; margin: 14px 0 0; }
+@media (max-width: 600px) { .how-stages li { grid-template-columns: 1fr; } .how-tech { grid-template-columns: 1fr; } }
+.ai-badge { white-space: nowrap; flex: none; }
+.ai-badge.verified { border-color: color-mix(in srgb, var(--good) 70%, transparent); color: var(--good); }
+.verifier { margin-bottom: 6px; color: #cfd8e5; }
+.verifier strong { color: var(--good); font-weight: 600; }
+.verifier-fix { display: block; margin-top: 2px; padding-left: 10px; border-left: 2px solid var(--good); color: var(--muted); }

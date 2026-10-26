@@ -21,7 +21,7 @@ from .explain import PERSONAS, NameContext, _language_name, reasons
 log = logging.getLogger(__name__)
 
 MOMENT_KINDS = ["goal", "big_chance", "red_card", "control_shift", "pressure_surge"]
-PLAYER_METRICS = ["goals", "assists", "xg", "shots", "distance_km", "top_speed_kmh", "sprints",
+PLAYER_METRICS = ["rating", "goals", "assists", "xg", "shots", "distance_km", "top_speed_kmh", "sprints",
                   "pass_accuracy_pct", "ball_wins", "pressures", "difficult_completed"]
 TREND_METRICS = ["win_probability", "control", "pressure", "momentum", "rhythm"]
 EVENT_TYPES = ["pass", "carry", "shot", "pressure", "tackle", "interception", "recovery", "save", "foul",
@@ -47,7 +47,9 @@ TOOLS = [
     _fn("get_player_stats", "Live stats for one player: goals, assists, shots, xG, passing, ball wins, "
         "pressures, distance, top speed, sprints.",
         {"player": {"type": "string", "description": "Player name or surname, e.g. 'Dembe'"}}, ["player"]),
-    _fn("top_players", "Rank the players by one metric, optionally for one team.",
+    _fn("top_players", "Rank the players by one metric, optionally for one team. 'rating' is the overall "
+        "match rating (goals, assists, xG, shots on target, hard passes completed, ball wins, passing volume): "
+        "use it for 'best', 'standout' or 'man of the match' questions.",
         {"metric": {"type": "string", "enum": PLAYER_METRICS}, "team": _team,
          "limit": {"type": "integer", "description": "How many players, default 5"}}, ["metric"]),
     _fn("find_moments", "Key moments so far, each with the computed reasons it mattered. Filter by kind, "
@@ -68,6 +70,7 @@ AGENT_PROMPT = """You are the live match analyst inside a football broadcast com
 Answer the viewer's question about the match in progress (now at {minute}).
 - Get facts with the tools. Never guess a number, name or event. If the tools cannot answer, say so.
 - Use as few tool calls as you need, usually one to three.
+- For "best player" or "standout" questions, rank by the overall rating, then explain with the player's stats.
 - Answer in {language}, for {persona}
 - Reply with only a JSON object: {{"answer": "<your answer>", "cites": ["<ids of key moments from find_moments you relied on>"]}}
 - Do not put moment ids in the answer text."""
@@ -145,6 +148,7 @@ class MatchTools:
             "ball_wins": p["tackles"] + p["interceptions"], "pressures": p["pressures"],
             "distance_km": p["distance_km"], "top_speed_kmh": p["top_speed_kmh"], "sprints": p["sprints"],
             "cards": {"yellow": p["yellow"], "red": p["red"]},
+            "rating": p["rating"],
         }
 
     def get_player_stats(self, args: dict) -> dict:

@@ -152,5 +152,15 @@ function StatRows({ rows, home, away }: { rows: (string | number)[][]; home: str
 }
 
 export function AiBadge({ o }: { o: Overlay }) {
-  return o.text.source === "llm" ? <span className="ai-badge" title="Written by the AI model from the computed facts">AI</span> : null;
+  if (o.text.source !== "llm") return null;
+  const verified = o.text.verification && o.text.verification.status !== "unchecked";
+  return verified ? (
+    <span className="ai-badge verified" title="Written by the Narrator agent, fact-checked by the Verifier agent against the computed facts">
+      AI · verified
+    </span>
+  ) : (
+    <span className="ai-badge" title="Written by the AI model from the computed facts">
+      AI
+    </span>
+  );
 }

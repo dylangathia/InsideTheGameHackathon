@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import json
 import logging
+import math
+import re
 from dataclasses import dataclass
 
 from ..i18n import LANGUAGES, LLM_ONLY_LANGUAGES, tr
@@ -293,6 +295,79 @@ Rules:
 Return only a JSON object: {{"headline": "<max 8 words>", "body": "<the explanation>"}}"""
 
 
+VERIFIER_PROMPT = """You are the fact-checker for live football broadcast graphics.
+FACTS, WHY_IT_MATTERS and REFERENCE_TEXT were produced by the match analytics engine and are correct.
+Every number in the draft has already been checked by software, so do not check numbers or rounding.
+TEAM is the club the moment belongs to (the scoring team for a goal). Scores are labelled with club names.
+Check the DRAFT, which may be in any language, against the facts. List a problem only if the draft:
+- gets a player, team, score or outcome wrong (e.g. credits a goal to the wrong club),
+- says or implies the match is over, or that a team has won, unless the facts say the match has finished,
+- frames the moment the wrong way round for the viewer's club (good news vs bad news),
+- adds events, records or history that are not in the facts.
+Only list errors that would mislead a viewer. Ignore wording, adjectives, approximate phrasing ("in the 36th minute",
+"a powerful shot") and accurate football phrasing (e.g. "doubles the lead" from 1-0 to 2-0).
+List only real errors. Never list something you then say is correct. If there are no errors, return an empty list.
+Return only JSON: {"problems": ["<short description in English>", ...]}"""
+
+_NUM = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def numbers_in(text: str) -> list[str]:
+    """Numbers as written, normalised: '101,5' -> '101.5', '12.0' -> '12'. Whole numbers 0-3 are ignored ('1st', '2-1')."""
+    out = []
+    for raw in _NUM.findall(text):
+        n = raw.replace(",", ".")
+        if "." in n:
+            n = n.rstrip("0").rstrip(".")
+        try:
+            if "." not in n and int(n) <= 3:
+                continue
+        except ValueError:
+            continue
+        out.append(n)
+    return out
+
+
+def _forms(v: float) -> set[str]:
+    out = set()
+    for form in (v, round(v, 1), round(v, 2), math.floor(v), math.ceil(v), round(v)):
+        txt = f"{form}"
+        if "." in txt:
+            txt = txt.rstrip("0").rstrip(".")
+        out.add(txt)
+    return out
+
+
+def allowed_numbers(ins: dict, ctx: NameContext, texts: list[str]) -> set[str]:
+    """Every number the narration may legitimately use, in the forms it may be written."""
+    allowed: set[str] = set()
+
+    def walk(x) -> None:
+        if isinstance(x, bool) or x is None:
+            return
+        if isinstance(x, (int, float)):
+            allowed.update(_forms(float(x)))
+            if 0 < x < 1:  # probabilities and xG may be quoted as percentages
+                allowed.update(_forms(round(x * 100)))
+        elif isinstance(x, (list, tuple)):
+            for y in x:
+                walk(y)
+        elif isinstance(x, dict):
+            for y in x.values():
+                walk(y)
+        elif isinstance(x, str):
+            allowed.update(numbers_in(x))
+
+    allowed.update({"5", "10", "11", "45", "90"})  # index windows, a full XI, the halves
+    walk(ins["facts"])
+    walk(ins["minute"])
+    for t in texts:
+        allowed.update(numbers_in(t or ""))
+    if ins["facts"].get("minutes_left") is not None:
+        allowed.update(_forms(90 - ins["facts"]["minutes_left"]))
+    return allowed
+
+
 def _language_name(code: str) -> str:
     return LANGUAGES.get(code) or LLM_ONLY_LANGUAGES.get(code) or "English"
 
@@ -302,12 +377,15 @@ class Narrator:
 
     LLM_KINDS = {"goal", "big_chance", "red_card", "control_shift", "pressure_surge", "recap"}
 
-    def __init__(self, llm: "LLMClient | bool | None" = None):
+    def __init__(self, llm: "LLMClient | bool | None" = None, verify: bool = True):
         """llm=None reads Foundry settings from the environment; llm=False forces template-only."""
         if llm is None:
             llm = LLMClient.from_env()
         self.llm = llm or None
+        self.verify = verify
         self.cache: dict[tuple, dict] = {}
+        self.stats = {"checked": 0, "failed_first": 0, "rejected": 0}
+        self.rejections: list[dict] = []
 
     @property
     def enabled(self) -> bool:
@@ -326,6 +404,7 @@ class Narrator:
         return SYSTEM_PROMPT.format(language=_language_name(profile.language), persona=persona, fan=fan)
 
     async def rewrite(self, ins: dict, profile, ctx: NameContext, draft: dict) -> dict | None:
+        """Narrator agent writes, Verifier agent checks; one rewrite on failure, else keep the template."""
         key = (ins["id"], profile.mode, profile.language, profile.club, profile.player, profile.metric)
         if key in self.cache:
             return self.cache[key]
@@ -340,16 +419,70 @@ class Narrator:
             "why_it_matters": en_reasons,
             "draft_in_english": draft if profile.language == "en" else None,
         }
+        out = await self._write(ins, profile, ctx, payload)
+        if out is None:
+            return None
+        verification = {"status": "unchecked"}
+        if self.verify:
+            problems = await self.check(ins, profile, ctx, out, payload, draft)
+            self.stats["checked"] += 1
+            if problems:
+                self.stats["failed_first"] += 1
+                log.info("Verifier rejected %s (%s): %s", ins["id"], profile.language, problems)
+                retry = await self._write(ins, profile, ctx, {**payload, "rejected_draft": out,
+                                                              "fix_these_problems": problems})
+                second = await self.check(ins, profile, ctx, retry, payload, draft) if retry else ["no rewrite"]
+                if second:
+                    self.stats["rejected"] += 1
+                    self.rejections.append({"insight": ins["id"], "language": profile.language, "key": key,
+                                            "draft": out, "problems": problems, "second": second})
+                    return None  # the template text stays on screen
+                out = retry
+                verification = {"status": "passed_after_rewrite", "problems_fixed": problems}
+            else:
+                verification = {"status": "passed"}
+        result = {**draft, "headline": out["headline"], "body": out.get("body", ""), "why": [], "source": "llm",
+                  "verification": verification}
+        self.cache[key] = result
+        return result
+
+    async def _write(self, ins: dict, profile, ctx: NameContext, payload: dict) -> dict | None:
         try:
             out = await self.llm.complete_json(self._system(profile, ctx), json.dumps(payload, ensure_ascii=False))
         except Exception as exc:
             log.warning("LLM narration failed for %s: %s", ins["id"], exc)
             return None
-        if not out or not out.get("headline"):
-            return None
-        result = {**draft, "headline": out["headline"], "body": out.get("body", ""), "why": [], "source": "llm"}
-        self.cache[key] = result
-        return result
+        return out if out and out.get("headline") else None
+
+    async def check(self, ins: dict, profile, ctx: NameContext, out: dict, payload: dict, draft: dict) -> list[str]:
+        """The Verifier agent: a deterministic number check, then an LLM fact-check. Returns problems ([] = pass)."""
+        text = f"{out.get('headline', '')} {out.get('body', '')}"
+        allowed = allowed_numbers(ins, ctx, [*payload["why_it_matters"], draft.get("headline", ""),
+                                             draft.get("sub", ""), draft.get("body", "")])
+        stray = [n for n in numbers_in(text) if n not in allowed]
+        if stray:
+            return [f"Numbers not supported by the facts: {', '.join(stray)}"]
+        club = ctx.club_by_short.get(profile.club) if profile.club else None
+        review = {
+            "moment": ins["kind"].replace("_", " "),
+            "team": payload["team"],
+            "facts": payload["facts"],
+            "why_it_matters": payload["why_it_matters"],
+            "reference_text": " ".join(x for x in (draft.get("headline"), draft.get("sub"), draft.get("body"),
+                                                   *draft.get("why", [])) if x),
+            "minute": payload["minute"],
+            "home": payload["home"], "away": payload["away"],
+            "viewer_supports": club,
+            "draft": {"headline": out.get("headline"), "body": out.get("body")},
+        }
+        try:
+            verdict = await self.llm.complete_json(VERIFIER_PROMPT, json.dumps(review, ensure_ascii=False),
+                                                   max_tokens=250, temperature=0.0)
+        except Exception as exc:
+            log.warning("Verifier unavailable for %s: %s", ins["id"], exc)
+            return ["verifier unavailable"]  # never show unchecked AI text
+        problems = [str(p) for p in verdict.get("problems", []) if str(p).strip()]
+        return problems[:5]
 
     async def answer(self, question: str, context: dict, profile, ctx: NameContext) -> dict:
         if not self.enabled:
@@ -372,12 +505,29 @@ class Narrator:
 
 def readable_facts(facts: dict, ctx: NameContext) -> dict:
     """The facts exactly as the model sees them: player ids resolved to names, internal fields dropped."""
+    name = lambda pid: ctx.full_names.get(pid, pid)  # noqa: E731
     out = {}
     for k, v in facts.items():
         if k in ("scorer", "shooter", "assist", "player", "passer", "recipient") and isinstance(v, str):
-            out[k] = ctx.full_names.get(v, v)
-        elif k in ("stats", "star", "key_moments", "opp_momentum", "seq_start", "high_regain", "lead_before"):
+            out[k] = name(v)
+        elif k in ("key_moments", "opp_momentum", "seq_start", "high_regain", "lead_before", "turning_point"):
             continue
+        elif k == "stats":  # recaps: team stats by club name
+            keep = ("goals", "shots", "on_target", "xg", "possession_pct", "pass_completion_pct", "pressures", "corners")
+            out[k] = {ctx.team(side): {f: row[f] for f in keep} for side, row in v.items()}
+        elif k == "goals":
+            out[k] = [{"minute": g["minute"], "scorer": name(g["player"]), "team": ctx.team(g["side"])} for g in v]
+        elif k == "star":
+            out[k] = {"name": name(v["id"]), "goals": v["goals"], "assists": v["assists"],
+                      "pass_accuracy_pct": v["pass_accuracy_pct"], "distance_km": v["distance_km"]}
+        elif k in ("fastest", "most_distance") and isinstance(v, dict):
+            out[k] = {**v, "player": name(v["player"])}
+        elif k in ("wp_before", "wp_after", "wp") and isinstance(v, (int, float)):
+            out[f"win_probability_{k[3:] or 'now'}_pct"] = v
+        elif k in ("score", "score_before", "score_after") and isinstance(v, list):
+            out[k] = {ctx.team("home"): v[0], ctx.team("away"): v[1]}
+        elif k == "wp" and isinstance(v, list):
+            out["win_probability"] = {ctx.team("home"): v[0], "draw": v[1], ctx.team("away"): v[2]}
         else:
             out[k] = v
     return out
