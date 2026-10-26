@@ -5,6 +5,7 @@
     python cli.py generate --home NBR --away KSU --seed 7 --out ../data
     python cli.py report --scenario comeback --mode casual --lang es [--club RVA] [--player RVA-10]
     python cli.py evaluate        # groundedness of AI narration -> docs/evaluation.md (needs Foundry keys)
+    python cli.py autoevent       # computer vision over a rendered video feed -> docs/auto-eventing.md + clip
 """
 from __future__ import annotations
 
@@ -72,10 +73,24 @@ def main(argv: list[str] | None = None) -> None:
     rp.add_argument("--player")
     rp.add_argument("--metric", default="speed")
     rp.add_argument("--all", action="store_true", help="include non-key overlays")
+    ae = sub.add_parser("autoevent", help="computer vision over a rendered video feed, scored against the truth")
+    ae.add_argument("--out", default="../docs/auto-eventing.md")
+    ae.add_argument("--clip", default="../docs/media/auto-eventing.mp4")
+    ae.add_argument("--seconds", type=float, default=300.0, help="length of each match window")
     ev = sub.add_parser("evaluate", help="run every key moment through the Narrator and Verifier agents")
     ev.add_argument("--out", default="../docs/evaluation.md")
     args = ap.parse_args(argv)
 
+    if args.cmd == "autoevent":
+        from footie.vision.report import build_report
+
+        Path(args.clip).parent.mkdir(parents=True, exist_ok=True)
+        text = build_report(args.clip, args.seconds)
+        Path(args.out).write_text(text, encoding="utf-8")
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")
+        print(text)
+        return
     if args.cmd == "evaluate":
         from dotenv import load_dotenv
 

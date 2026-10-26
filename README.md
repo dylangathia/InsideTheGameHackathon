@@ -76,7 +76,7 @@ Other things the brief lists:
 | Data innovation | our own match engine + tracking generator, dataset in [data/](data/), `python cli.py generate` for unlimited new matches |
 | Multi-language | English, Spanish, French, Swahili via templates (offline); Portuguese, Arabic and Hindi too when Foundry is on |
 | Personal modes | Analyst · Casual fan · Player focus · Single metric, plus favourite-club framing. **Player Cam** (in Player focus): the pitch follows the player with their trail, live speed, vision cone, the gap to the nearest opponent, and every pass option scored by difficulty |
-| Auto-eventing from video | **not built** (stretch goal; see "Next steps") |
+| Auto-eventing from video | Computer vision over a rendered, degraded video feed finds passes and shots and measures their distance and speed, scored against the synthetic ground truth: 99% of passes and 4 of 5 shots found, 96% precision, pass distance within 1.2 m, ball speed within 2.3 km/h ([docs/auto-eventing.md](docs/auto-eventing.md), `python cli.py autoevent`). Not tested on real footage |
 
 ---
 
