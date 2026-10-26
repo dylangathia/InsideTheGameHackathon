@@ -190,7 +190,8 @@ class Connection:
             if show["source"] == "llm":
                 SHOWS[key] = show
         else:
-            on_step("pundit", "presenting", show["title"])
+            for step in show.get("trace", []):
+                on_step(*step)
         await self.send({"type": "show", "viewer": vi, "show": show})
 
     async def send_history(self) -> None:

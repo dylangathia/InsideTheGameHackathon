@@ -319,8 +319,38 @@ Check the DRAFT, which may be in any language, against the facts. List a problem
 - adds events, records or history that are not in the facts.
 Only list errors that would mislead a viewer. Ignore wording, adjectives, approximate phrasing ("in the 36th minute",
 "a powerful shot") and accurate football phrasing (e.g. "doubles the lead" from 1-0 to 2-0).
-List only real errors. Never list something you then say is correct. If there are no errors, return an empty list.
-Return only JSON: {"problems": ["<short description in English>", ...]}"""
+PLAYER_CLUBS says which club each named player plays for.
+For each possible issue, decide whether it really is an error before you list it. If on reflection the draft is
+correct, set "is_error" to false. If there are no errors, return an empty list.
+Return only JSON: {"problems": [{"problem": "<short description in English>", "is_error": true}]}"""
+
+# A verifier that talks itself out of a problem ("...which matches the draft. No error here.") has not found one.
+_SELF_CLEARED = re.compile(r"\b(no errors? (here|found)|no (clear )?(misleading )?error|framing is correct|"
+                           r"which is correct|which is accurate|not misleading|matches the draft|no problem)\b", re.I)
+
+
+def real_problems(verdict: dict) -> list[str]:
+    """The verifier's problems that it actually judged to be errors."""
+    out = []
+    for p in verdict.get("problems", []) or []:
+        if isinstance(p, dict):
+            if p.get("is_error") is False:
+                continue
+            p = p.get("problem", "")
+        text = str(p).strip()
+        if text and not _SELF_CLEARED.search(text):
+            out.append(text)
+    return out[:5]
+
+
+def player_clubs(facts: dict, ctx: "NameContext") -> dict[str, str]:
+    """Each player named in the facts, with their club (ids look like 'RVA-7')."""
+    out = {}
+    for k in ("scorer", "shooter", "assist", "player", "passer", "recipient"):
+        pid = facts.get(k)
+        if isinstance(pid, str) and "-" in pid:
+            out[ctx.full_names.get(pid, pid)] = ctx.club_by_short.get(pid.split("-")[0], "")
+    return out
 
 _NUM = re.compile(r"\d+(?:[.,]\d+)?")
 
@@ -397,6 +427,7 @@ class Narrator:
         self.llm = llm or None
         self.verify = verify
         self.cache: dict[tuple, dict] = {}
+        self.traces: dict[tuple, list[tuple[str, str, str]]] = {}  # the agent steps behind each cached text
         self.stats = {"checked": 0, "failed_first": 0, "rejected": 0}
         self.rejections: list[dict] = []
 
@@ -417,6 +448,20 @@ class Narrator:
         return SYSTEM_PROMPT.format(language=_language_name(profile.language), persona=persona, fan=fan)
 
     @staticmethod
+    def payload(ins: dict, profile, ctx: NameContext, draft: dict) -> dict:
+        """What the Narrator is given (and the Verifier checks against): facts, reasons and the template draft."""
+        return {
+            "moment": ins["kind"],
+            "minute": ins["minute"],
+            "home": ctx.team("home"),
+            "away": ctx.team("away"),
+            "team": ctx.team(ins["side"]) if ins["side"] else None,
+            "facts": readable_facts(ins["facts"], ctx),
+            "why_it_matters": [tr("en", c, **p) for c, p in reasons(ins, ctx)],
+            "draft_in_english": draft if profile.language == "en" else None,
+        }
+
+    @staticmethod
     def cache_key(ins: dict, profile, ctx: NameContext) -> tuple:
         """Moment ids restart in every match, so the key also names the match (its clubs) and the moment's time."""
         return (ctx.team("home"), ctx.team("away"), ins["id"], ins["t"], ins["kind"],
@@ -429,11 +474,19 @@ class Narrator:
         """
         key = self.cache_key(ins, profile, ctx)
         if key in self.cache:
+            # Same text as before: replay the agent steps that produced it, so the desk shows how it was made.
+            for step in self.traces.get(key, []):
+                if on_step:
+                    on_step(*step)
             return self.cache[key]
         moment = f"{ins['minute']} {ins['kind'].replace('_', ' ')}"
         attempts = 0
+        payload = self.payload(ins, profile, ctx, draft)
+        trace: list[tuple[str, str, str]] = []
+        self.traces[key] = trace
 
         def emit(agent: str, action: str, detail: str = "") -> None:
+            trace.append((agent, action, detail))
             if on_step:
                 on_step(agent, action, detail)
 
@@ -450,17 +503,6 @@ class Narrator:
             emit("verifier", "flagged" if problems else "passed", problems[0] if problems else moment)
             return problems
 
-        en_reasons = [tr("en", c, **p) for c, p in reasons(ins, ctx)]
-        payload = {
-            "moment": ins["kind"],
-            "minute": ins["minute"],
-            "home": ctx.team("home"),
-            "away": ctx.team("away"),
-            "team": ctx.team(ins["side"]) if ins["side"] else None,
-            "facts": readable_facts(ins["facts"], ctx),
-            "why_it_matters": en_reasons,
-            "draft_in_english": draft if profile.language == "en" else None,
-        }
         if self.verify and orchestration.enabled(self.llm):
             # Microsoft Agent Framework workflow: narrator -> verifier, one rewrite on failure.
             outcome = await orchestration.narrate_and_verify(
@@ -549,6 +591,7 @@ class Narrator:
             "minute": payload["minute"],
             "home": payload["home"], "away": payload["away"],
             "viewer_supports": club,
+            "player_clubs": player_clubs(ins["facts"], ctx),
             "draft": {"headline": out.get("headline"), "body": out.get("body")},
         }
         try:
@@ -557,8 +600,7 @@ class Narrator:
         except Exception as exc:
             log.warning("Verifier unavailable for %s: %s", ins["id"], exc)
             return ["verifier unavailable"]  # never show unchecked AI text
-        problems = [str(p) for p in verdict.get("problems", []) if str(p).strip()]
-        return problems[:5]
+        return real_problems(verdict)
 
     async def answer(self, question: str, context: dict, profile, ctx: NameContext) -> dict:
         if not self.enabled:

@@ -16,7 +16,7 @@ import logging
 from ..i18n import tr
 from . import orchestration
 from .agent import PUNDIT_TOOLS, MatchTools, _step_label
-from .explain import PERSONAS, _language_name, allowed_numbers, numbers_in, reasons
+from .explain import PERSONAS, _language_name, allowed_numbers, numbers_in, real_problems, reasons
 
 log = logging.getLogger(__name__)
 
@@ -37,8 +37,9 @@ SHOW_VERIFIER_PROMPT = """You are the fact-checker for a half-time analysis scri
 EVIDENCE is the exact output of the match tools the pundit used, and it is correct. Numbers have already been
 checked by software. List a problem only if the SCRIPT gets a player, team, score or outcome wrong, says or implies
 the match is over, describes a move differently from its breakdown, or adds events that are not in the evidence.
-Ignore style and wording. If there are no errors, return an empty list.
-Return only JSON: {"problems": ["<short description in English>", ...]}"""
+Ignore style and wording. For each possible issue, decide whether it really is an error before you list it; if the
+script is in fact correct, set "is_error" to false. If there are no errors, return an empty list.
+Return only JSON: {"problems": [{"problem": "<short description in English>", "is_error": true}]}"""
 
 
 def _first_half_moments(session) -> list[dict]:
@@ -82,7 +83,10 @@ async def build_show(llm, session, profile, on_step=None) -> dict:
     if not orchestration.enabled(llm) or not _first_half_moments(session):
         return template_show(session, profile)
 
+    trace: list[list[str]] = []
+
     def emit(agent: str, action: str, detail: str = "") -> None:
+        trace.append([agent, action, detail])
         if on_step:
             try:
                 on_step(agent, action, detail)
@@ -132,7 +136,7 @@ async def build_show(llm, session, profile, on_step=None) -> dict:
                     llm, "verifier", SHOW_VERIFIER_PROMPT,
                     json.dumps({"score_at_half_time": _score(session), "evidence": evidence, "script": show},
                                ensure_ascii=False), max_tokens=300, temperature=0.0)
-                problems = [str(p) for p in verdict.get("problems", []) if str(p).strip()][:5]
+                problems = real_problems(verdict)
             except Exception as exc:
                 log.warning("show verifier unavailable: %s", exc)
                 problems = ["verifier unavailable"]
@@ -144,6 +148,7 @@ async def build_show(llm, session, profile, on_step=None) -> dict:
         show = _assemble(session, outcome.out, "llm", outcome.status)
         if show["segments"]:
             emit("pundit", "presenting", show["title"])
+            show["trace"] = trace  # replayed on the agent desk when the cached show is shown again
             return show
     emit("verifier", "rejected", "the half-time script: the template show runs instead")
     return template_show(session, profile)

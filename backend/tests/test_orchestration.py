@@ -51,3 +51,18 @@ def test_workflow_rejects_after_two_failures():
     assert asyncio.run(n.rewrite(goal, Profile(), s.ctx, _draft(s, goal, Profile()))) is None
     assert n.stats == {"checked": 1, "failed_first": 1, "rejected": 1}
     assert len(stub.calls) == 2  # written, rewritten once, then the template stays
+
+
+def test_cached_text_replays_the_agent_steps_that_made_it():
+    s, goal = _goal_session()
+    stub = StubLLM(headlines=[
+        {"headline": "Thorne scores", "body": "A 140 km/h rocket."},
+        {"headline": "Thorne scores", "body": "Struck at 101.5 km/h."},
+    ])
+    n = Narrator(llm=stub)
+    first, again = [], []
+    draft = _draft(s, goal, Profile())
+    asyncio.run(n.rewrite(goal, Profile(), s.ctx, draft, on_step=lambda *a: first.append(a[:2])))
+    asyncio.run(n.rewrite(goal, Profile(), s.ctx, draft, on_step=lambda *a: again.append(a[:2])))
+    assert first == [("narrator", "drafted"), ("verifier", "flagged"), ("narrator", "rewrote"), ("verifier", "passed")]
+    assert again == first and len(stub.calls) == 2  # replayed from the cache, no new model calls
