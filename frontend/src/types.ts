@@ -84,7 +84,39 @@ export interface Overlay {
   grounding?: Grounding; // key moments only: what the explanation rests on
 }
 
+export interface BreakdownStep {
+  n: number;
+  kind: "regain" | "restart" | "pass" | "carry" | "shot";
+  label: string;
+  detail?: string | null;
+  player: string | null;
+  to?: string | null;
+  t: number;
+  x: number | null;
+  y: number | null;
+  end_x: number | null;
+  end_y: number | null;
+}
+
+export interface Breakdown {
+  headline: string;
+  team: string;
+  side: Side;
+  t_shot: number;
+  steps: BreakdownStep[];
+  shape: {
+    team: string;
+    side: Side;
+    formation: string;
+    back_line_m: number;
+    back_line_players: number;
+    lines: [number, number][][];
+    box: { attackers: number; defenders: number };
+  } | null;
+}
+
 export interface Grounding {
+  breakdown?: Breakdown | null;
   facts: Record<string, string | number | boolean>;
   reasons: string[];
   events: { id: number; minute: string; type: string; team: string; player: string | null; detail: string | null }[];

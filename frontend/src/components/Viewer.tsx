@@ -18,6 +18,7 @@ interface Props {
   onProfile: (p: Profile) => void;
   onReplay: (t: number) => void;
   onAsk: (q: string) => void;
+  onFreeze: (t: number) => void;
   layout: "single" | "split";
   replaying: boolean;
 }
@@ -36,6 +37,13 @@ export function Viewer(props: Props) {
   const goals = overlays.filter((o) => o.kind === "goal");
   const focusClub = profile.player?.startsWith(home.short + "-") ? home : away;
   const languages = meta.llm ? { ...LANGUAGES, ...LLM_LANGUAGES } : LANGUAGES;
+  // Tactical breakdown: freeze the match at the shot and draw the move on the pitch.
+  const [board, setBoard] = useState<Overlay | null>(null);
+  const openBoard = (o: Overlay) => {
+    if (!o.grounding?.breakdown) return;
+    setBoard(o);
+    props.onFreeze(o.grounding.breakdown.t_shot);
+  };
 
   return (
     <section className="viewer" aria-label={props.label}>
@@ -110,22 +118,25 @@ export function Viewer(props: Props) {
             overlays={overlays}
             profile={profile}
             replaying={props.replaying}
+            board={board?.grounding?.breakdown ?? null}
+            onCloseBoard={() => setBoard(null)}
           />
         );
         if (!state) return stage;
         const feed =
           profile.mode === "analyst" ? (
-            <Feed overlays={overlays} onReplay={props.onReplay} title="Commentary & key moments" />
+            <Feed onBreakdown={openBoard} overlays={overlays} onReplay={props.onReplay} title="Commentary & key moments" />
           ) : profile.mode === "casual" ? (
-            <Feed overlays={overlays.filter((o) => o.key || o.type === "ticker")} onReplay={props.onReplay} title="The story so far" />
+            <Feed onBreakdown={openBoard} overlays={overlays.filter((o) => o.key || o.type === "ticker")} onReplay={props.onReplay} title="The story so far" />
           ) : profile.mode === "player" ? (
             <Feed
+              onBreakdown={openBoard}
               overlays={overlays.filter((o) => (profile.player && o.players.includes(profile.player)) || o.kind === "goal" || o.type === "ticker")}
               onReplay={props.onReplay}
               title="Their match"
             />
           ) : (
-            <Feed overlays={overlays} onReplay={props.onReplay} title="Moments" />
+            <Feed onBreakdown={openBoard} overlays={overlays} onReplay={props.onReplay} title="Moments" />
           );
         const ask = (
           <AskBox

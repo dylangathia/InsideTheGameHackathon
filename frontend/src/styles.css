@@ -275,3 +275,18 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .cam-on .lower-head { font-size: clamp(15px, 2.6cqw, 24px); }
 .cam-on .lower-why li:nth-child(n + 2) { display: none; }
 .cam-on .smalls { max-width: 42%; }
+
+/* ---------- tactical breakdown */
+.breakdown-btn { border-color: color-mix(in srgb, var(--accent) 60%, transparent); color: var(--accent); }
+.board-panel { position: absolute; top: 2.5cqw; right: 2.5cqw; bottom: 2.5cqw; width: min(34%, 340px); overflow: auto; background: rgba(10, 14, 22, 0.94); border-top: 3px solid var(--accent); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; font-size: clamp(11px, 1.45cqw, 14px); animation: slide-left 0.3s ease-out; }
+.board-kicker { font-family: var(--font-mono); font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+.board-head { font-family: var(--font-display); font-weight: 700; font-size: 1.45em; text-transform: uppercase; line-height: 1.1; }
+.board-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.board-step { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; }
+.board-n { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #fff; color: #111; font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+.board-regain .board-n, .board-restart .board-n { background: var(--accent); }
+.board-shot .board-n { background: #ff5d5d; color: #fff; }
+.board-step em { color: var(--accent); font-style: normal; font-family: var(--font-mono); font-size: 0.9em; }
+.board-who { display: block; color: var(--muted); font-size: 0.9em; }
+.board-shape { margin: 0; padding-top: 6px; border-top: 1px solid var(--line); color: #cfd8e5; }
+.board-panel.left { right: auto; left: 2.5cqw; top: calc(2.5cqw + 44px); }

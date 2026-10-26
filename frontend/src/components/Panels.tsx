@@ -187,9 +187,10 @@ export function StatsTable({ state, home, away }: { state: MatchState; home: Clu
   );
 }
 
-export function Feed({ overlays, onReplay, title = "Live feed", limit = 60 }: {
+export function Feed({ overlays, onReplay, onBreakdown, title = "Live feed", limit = 60 }: {
   overlays: Overlay[];
   onReplay: (t: number) => void;
+  onBreakdown?: (o: Overlay) => void;
   title?: string;
   limit?: number;
 }) {
@@ -208,7 +209,7 @@ export function Feed({ overlays, onReplay, title = "Live feed", limit = 60 }: {
               {o.text.headline}
             </li>
           ) : o.type === "recap" ? null : (
-            <Moment key={o.id} o={o} onReplay={onReplay} />
+            <Moment key={o.id} o={o} onReplay={onReplay} onBreakdown={onBreakdown} />
           ),
         )}
       </ol>
@@ -216,7 +217,7 @@ export function Feed({ overlays, onReplay, title = "Live feed", limit = 60 }: {
   );
 }
 
-function Moment({ o, onReplay }: { o: Overlay; onReplay: (t: number) => void }) {
+function Moment({ o, onReplay, onBreakdown }: { o: Overlay; onReplay: (t: number) => void; onBreakdown?: (o: Overlay) => void }) {
   const [open, setOpen] = useState(false);
   return (
     <li className={`feed-moment feed-${o.kind}`}>
@@ -228,6 +229,11 @@ function Moment({ o, onReplay }: { o: Overlay; onReplay: (t: number) => void }) 
           {o.grounding && (
             <button className="replay" onClick={() => setOpen(!open)} aria-expanded={open} title="Show what this is based on">
               Sources
+            </button>
+          )}
+          {o.grounding?.breakdown && onBreakdown && (
+            <button className="replay breakdown-btn" onClick={() => onBreakdown(o)} title="Show the move on the pitch">
+              Breakdown
             </button>
           )}
           <button className="replay" onClick={() => onReplay(o.t)} title="Replay this moment">

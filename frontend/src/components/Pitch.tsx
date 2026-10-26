@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { FrameBuffer } from "../useMatchStream";
-import type { Club } from "../types";
+import type { Breakdown, Club } from "../types";
 
 // View box in metres: the 105 x 68 pitch plus a 3 m margin.
 export const VIEW = { x0: -3, y0: -3, w: 111, h: 74 };
@@ -26,6 +26,7 @@ interface Props {
   favClub: string | null;
   playerCam: boolean;
   camera: React.MutableRefObject<Camera>;
+  board: Breakdown | null;
 }
 
 const FRAME_MS = 100;
@@ -49,10 +50,10 @@ function distToSegment(px: number, py: number, ax: number, ay: number, bx: numbe
   return { d: Math.hypot(px - cx, py - cy), t };
 }
 
-export function Pitch({ frames, home, away, focusPlayer, favClub, playerCam, camera }: Props) {
+export function Pitch({ frames, home, away, focusPlayer, favClub, playerCam, camera, board }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const props = useRef({ home, away, focusPlayer, favClub, playerCam });
-  props.current = { home, away, focusPlayer, favClub, playerCam };
+  const props = useRef({ home, away, focusPlayer, favClub, playerCam, board });
+  props.current = { home, away, focusPlayer, favClub, playerCam, board };
 
   useEffect(() => {
     const el = canvas.current!;
@@ -73,10 +74,17 @@ export function Pitch({ frames, home, away, focusPlayer, favClub, playerCam, cam
     let trailFor: string | null = null;
     let lastFrameT = -1;
     let vel = { x: 0, y: 0 };
+    // Breakdown animation: when it opened, so the steps can appear one after another.
+    let boardShown: Breakdown | null = null;
+    let boardStart = 0;
 
     const draw = () => {
       raf = requestAnimationFrame(draw);
-      const { home, away, focusPlayer, favClub, playerCam } = props.current;
+      const { home, away, focusPlayer, favClub, playerCam, board } = props.current;
+      if (board !== boardShown) {
+        boardShown = board;
+        boardStart = performance.now();
+      }
       const { prev, cur, at } = frames.current;
       const a = Math.min(1, (performance.now() - at) / FRAME_MS);
       const prevPos = new Map(prev?.players.map((p) => [p[0], p]) ?? []);
@@ -115,7 +123,28 @@ export function Pitch({ frames, home, away, focusPlayer, favClub, playerCam, cam
 
       // Camera: glide towards the focused player (or back to the full pitch), clamped to the pitch.
       const cam = camera.current;
-      const target = camOn ? { cx: focus!.x, cy: focus!.y, z: CAM_ZOOM } : FULL_VIEW;
+      let target = camOn ? { cx: focus!.x, cy: focus!.y, z: CAM_ZOOM } : FULL_VIEW;
+      if (board) {
+        // Frame the whole move.
+        const xs: number[] = [];
+        const ys: number[] = [];
+        for (const st of board.steps) {
+          for (const [x, y] of [[st.x, st.y], [st.end_x, st.end_y]] as const) {
+            if (x !== null && y !== null) {
+              xs.push(x);
+              ys.push(y);
+            }
+          }
+        }
+        if (xs.length) {
+          const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+          // Fit the move into the two thirds of the view not covered by the caption panel.
+          const z = Math.max(1, Math.min(2.2, Math.min((0.64 * VIEW.w) / (x1 - x0 + 14), VIEW.h / (y1 - y0 + 16))));
+          const panelOnLeft = (x0 + x1) / 2 > 52.5; // same rule as the Stage's caption panel
+          const shift = (0.17 * VIEW.w) / z;
+          target = { cx: (x0 + x1) / 2 + (panelOnLeft ? -shift : shift), cy: (y0 + y1) / 2, z };
+        }
+      }
       cam.z += (target.z - cam.z) * 0.08;
       cam.cx += (target.cx - cam.cx) * 0.1;
       cam.cy += (target.cy - cam.cy) * 0.1;
@@ -133,6 +162,54 @@ export function Pitch({ frames, home, away, focusPlayer, favClub, playerCam, cam
       if (!cur) return;
 
       const labels: (() => void)[] = [];
+
+      if (board) {
+        // The defending team's lines at the moment of the shot.
+        if (board.shape) {
+          ctx.setLineDash([0.8 * ms, 0.6 * ms]);
+          ctx.lineWidth = 0.22 * ms;
+          ctx.strokeStyle = "rgba(255,255,255,0.55)";
+          for (const line of board.shape.lines) {
+            if (line.length < 2) continue;
+            ctx.beginPath();
+            line.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))));
+            ctx.stroke();
+          }
+          ctx.setLineDash([]);
+          const back = board.shape.lines[0];
+          if (back?.length) {
+            const [bx, by] = back[0];
+            const label = `Back line · ${board.shape.back_line_m} m from goal`;
+            labels.push(() => pill(ctx, X(bx), Y(by) + 2.4 * ms, label, "#cfd8e5", ms));
+          }
+        }
+        // The move, one step at a time: each arrow grows from passer to receiver.
+        const STEP_MS = 650;
+        const elapsed = performance.now() - boardStart;
+        const shown = Math.min(board.steps.length, Math.floor(elapsed / STEP_MS) + 1);
+        board.steps.slice(0, shown).forEach((st, i) => {
+          const grow = i === shown - 1 ? Math.min(1, (elapsed - i * STEP_MS) / (STEP_MS * 0.8)) : 1;
+          if (st.x === null || st.y === null) return;
+          if ((st.kind === "regain" || st.kind === "restart") || st.end_x === null || st.end_y === null) {
+            const pulse = 1 + 0.15 * Math.sin(performance.now() / 180);
+            ctx.strokeStyle = "#ffb547";
+            ctx.lineWidth = 0.35 * ms;
+            ctx.beginPath();
+            ctx.arc(X(st.x), Y(st.y), 2.2 * ms * pulse, 0, Math.PI * 2);
+            ctx.stroke();
+            const [bx, by] = [X(st.x) - 2.6 * ms, Y(st.y) - 2.6 * ms];
+            labels.push(() => badge(ctx, bx, by, st.n, "#ffb547", "#1b1300", ms));
+            return;
+          }
+          const ex = st.x + (st.end_x - st.x) * grow;
+          const ey = st.y + (st.end_y - st.y) * grow;
+          const shot = st.kind === "shot";
+          drawArrow(ctx, X(st.x), Y(st.y), X(ex), Y(ey), shot ? "#ff5d5d" : "#ffffff", (shot ? 0.5 : 0.32) * ms,
+            st.kind === "carry", ms);
+          const [mx, my] = [X((st.x + ex) / 2), Y((st.y + ey) / 2)];
+          labels.push(() => badge(ctx, mx, my, st.n, shot ? "#ff5d5d" : "#ffffff", shot ? "#ffffff" : "#111111", ms));
+        });
+      }
       if (camOn && focusPlayer && focus) {
         const mine = isHome(focusPlayer);
         const attack = mine ? 1 : -1;
@@ -287,6 +364,46 @@ export function Pitch({ frames, home, away, focusPlayer, favClub, playerCam, cam
   }, [frames, camera]);
 
   return <canvas ref={canvas} className="pitch-canvas" aria-label="Live pitch view" />;
+}
+
+function drawArrow(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, color: string,
+  width: number, dashed: boolean, ms: number) {
+  const len = Math.hypot(x1 - x0, y1 - y0);
+  if (len < 1) return;
+  const ux = (x1 - x0) / len;
+  const uy = (y1 - y0) / len;
+  const head = Math.min(1.6 * ms, len * 0.5);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = width;
+  ctx.setLineDash(dashed ? [0.9 * ms, 0.6 * ms] : []);
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1 - ux * head, y1 - uy * head);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 - ux * head - uy * head * 0.55, y1 - uy * head + ux * head * 0.55);
+  ctx.lineTo(x1 - ux * head + uy * head * 0.55, y1 - uy * head - ux * head * 0.55);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** A numbered step marker. */
+function badge(ctx: CanvasRenderingContext2D, x: number, y: number, n: number, bg: string, fg: string, ms: number) {
+  ctx.beginPath();
+  ctx.arc(x, y, 1.05 * ms, 0, Math.PI * 2);
+  ctx.fillStyle = bg;
+  ctx.fill();
+  ctx.lineWidth = 0.15 * ms;
+  ctx.strokeStyle = "rgba(0,0,0,0.6)";
+  ctx.stroke();
+  ctx.fillStyle = fg;
+  ctx.font = `700 ${1.1 * ms}px "IBM Plex Mono", monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(n), x, y + 0.05 * ms);
 }
 
 /** A small rounded label drawn on the canvas. */
