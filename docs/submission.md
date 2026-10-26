@@ -8,19 +8,26 @@ FootieManager
 
 ## Category
 
-Best Use of Microsoft Foundry Project
+Best Multi-Agent System
 
 ## Elevator pitch
 
-FootieManager turns a live, synthetic football match into intelligence that explains itself, then personalises it for every viewer. Our own match engine generates realistic event streams with 5 Hz player tracking. A five-stage pipeline ingests events as they happen, interprets them (pass difficulty, ball and shot speed, player sprints, xG, live win probability, and three story indices: control vs chaos, pressure and rhythm), explains why each moment matters through auditable reason codes, renders a timed, machine-readable overlay feed any broadcast graphics engine can draw, and personalises it. An analyst and a casual fan of the other club watch the same match side by side and get genuinely different experiences, in English, Spanish, French or Swahili. In Player focus, a Player Cam follows one player with their live speed, trail, vision cone, the pressure on them, and every pass option scored by difficulty.
+FootieManager is a live match desk run by three cooperating AI agents on Microsoft Foundry (gpt-4.1-mini). It turns a synthetic football match into intelligence that explains itself, then personalises it for every viewer.
 
-On Microsoft Foundry (gpt-4.1-mini), a Narrator agent writes the on-screen narration from computed facts only, and a Verifier agent fact-checks every line before it airs. Software checks each number, and an AI check covers players, teams, score and fan framing. Rejected drafts go back to the Narrator, and unverified AI text never reaches the screen. Across 206 narrations in four languages, the Verifier caught and fixed 13% of drafts, and 85% reached the screen as verified AI text, with the rest falling back to correct template text (docs/evaluation.md). Every key moment has a Sources panel showing what the model was given and what the Verifier fixed. "Ask the match" is a Foundry agent that chooses among six tools over the live match and shows each step it took. Every event streams into Microsoft Fabric (Eventstream to Eventhouse) for live KQL analysis.
+**Three agents, distinct roles, one shared match state.**
+- The **Narrator agent** writes on-screen narration and recaps from the computed facts only.
+- The **Verifier agent** fact-checks every line before it airs. Software checks each number against the facts, and an AI check at temperature 0 covers players, teams, score, outcome and fan framing.
+- The **"Ask the match" agent** answers viewers by choosing among six read-only tools over the live match (state, player stats, rankings, key moments, trends, event counts), and shows each step it took.
 
-**Problem it solves:** broadcasters and streaming platforms need match intelligence that is fast, trustworthy and tailored to each audience. Generic AI commentary can't be verified and treats every fan the same. FootieManager's insights are grounded and auditable, and personalised by design.
+**Handoffs and recovery.** A rejected draft goes back to the Narrator once, with the Verifier's list of problems. If it fails again, the system recovers by showing correct template text, so unverified AI text never reaches the screen. The agent falls back to a simpler answer, then to rules, if a model call fails. Across 206 narrations in four languages, the Verifier caught and fixed 13% of drafts (for example, a goal credited to the wrong team, and "breaks the deadlock" for a goal that made it 3-2). 85% reached the screen as verified AI text, with the rest falling back to template text (docs/evaluation.md). Every key moment has a Sources panel showing what the agents were given and what the Verifier fixed.
+
+**What the agents work on.** Our own match engine generates realistic event streams with 5 Hz tracking of all 22 players and the ball. A five-stage pipeline ingests events as they happen, interprets them (pass difficulty, ball and shot speed, sprints, xG, live win probability, and three story indices: control vs chaos, pressure and rhythm), explains why each moment matters, renders a timed, machine-readable overlay feed, and personalises it. An analyst and a casual fan of the other club watch the same match side by side and get genuinely different experiences, in English, Spanish, French or Swahili. In Player focus, a Player Cam follows one player with their speed, trail, vision cone, the pressure on them, and every pass option scored by difficulty. Every event also streams into Microsoft Fabric for live KQL analysis.
+
+**Problem it solves:** broadcasters and streaming platforms need match intelligence that is fast, trustworthy and tailored to each audience. A single AI writer can't be verified and treats every fan the same. Here one agent writes, another checks, and a third answers questions from live data.
 
 ## Microsoft and Azure technologies used
 
-- **Microsoft Foundry**, Azure OpenAI gpt-4.1-mini: three agents: the Narrator (grounded narration and recaps), the Verifier (fact-checks every line before it airs) and the tool-calling "Ask the match" agent
+- **Microsoft Foundry**, Azure OpenAI gpt-4.1-mini: the three agents (Narrator, Verifier, tool-calling "Ask the match" agent), orchestrated in our own Python code
 - **Microsoft Fabric** Real-Time Intelligence: Eventstream custom endpoint to an Eventhouse (KQL database) with live match events
 - **GitHub**: public repository, GitHub Actions CI (tests and front-end build)
 - **Azure Container Apps**: the live demo runs as a container on Azure Container Apps, built by GitHub Actions and published to GitHub Container Registry on every push to `main`

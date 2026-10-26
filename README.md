@@ -166,6 +166,8 @@ az containerapp up --name footiemanager --resource-group rg-footiemanager \
 
 GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the tests and the front-end build on every push.
 
+**Hosting costs (estimate).** The live demo runs on an Azure free account ($200 credit, 30 days from 26 October). Container Apps at 1 vCPU / 2 GB, always on, costs about $2.50 a day in the worst case, so about $40 through the end of judging (10 November). Foundry gpt-4.1-mini costs about $0.10 per full match watched with AI narration. A budget alert at $50 watches actual spend. A free account doesn't charge the card unless it's upgraded; if the credit ran out, Azure would stop the resources rather than bill.
+
 ---
 
 ## Reviewing the narration (no coding needed)
