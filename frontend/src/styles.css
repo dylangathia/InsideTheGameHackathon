@@ -241,3 +241,37 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .cam-legend .hard { background: #ff5d5d; }
 .cam-hud button { font-size: 0.85em; padding: 1px 8px; }
 @media (max-width: 700px) { .cam-legend { display: none; } }
+
+/* ---------- broadcast layout (single view): pitch + rail */
+.viewer-main { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr); gap: 12px; align-items: stretch; }
+.rail { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; }
+.rail .feed { flex: 1 1 0; min-height: 160px; max-height: none; overflow: auto; }
+.rail .ask { flex: none; }
+.rail .ask .answers { max-height: 180px; }
+@media (max-width: 1100px) { .viewer-main { grid-template-columns: 1fr; } .rail .feed { max-height: 420px; } }
+
+/* balanced panels: cards flow into columns instead of leaving gaps */
+.panels { display: block; columns: 2 320px; column-gap: 10px; }
+.single .panels { columns: 3 300px; }
+.panels > * { break-inside: avoid; margin-bottom: 10px; }
+.panels .ask { column-span: all; }
+
+/* goal moment */
+.stage.goal-flash { animation: goal-flash 1.6s ease-out; }
+@keyframes goal-flash {
+  0% { box-shadow: inset 0 0 0 0 var(--flash, #fff), 0 0 0 0 var(--flash, #fff); }
+  15% { box-shadow: inset 0 0 0 6px var(--flash, #fff), 0 0 28px 4px var(--flash, #fff); }
+  100% { box-shadow: inset 0 0 0 0 transparent, 0 0 0 0 transparent; }
+}
+.scorebug.pulse { animation: score-pulse 0.9s ease-out 2; }
+@keyframes score-pulse { 50% { transform: scale(1.12); } }
+
+/* replay banner */
+.replay-banner { position: absolute; top: 2.5cqw; left: 50%; transform: translateX(-50%); background: var(--accent); color: #1b1300; font-family: var(--font-display); font-weight: 700; font-size: clamp(14px, 2.4cqw, 22px); letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 14px; border-radius: 4px; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4); z-index: 2; }
+.cam-on .replay-banner { top: calc(2.5cqw + 44px); }
+
+/* Player Cam: keep the bottom of the zoomed pitch visible */
+.cam-on .lower { right: auto; max-width: 58%; }
+.cam-on .lower-head { font-size: clamp(15px, 2.6cqw, 24px); }
+.cam-on .lower-why li:nth-child(n + 2) { display: none; }
+.cam-on .smalls { max-width: 42%; }

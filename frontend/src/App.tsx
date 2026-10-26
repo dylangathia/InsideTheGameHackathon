@@ -13,7 +13,6 @@ interface ScenarioSummary {
 }
 
 const SPEEDS = [1, 5, 10, 20, 60];
-const STAGES = ["Ingest", "Interpret", "Explain", "Render", "Personalise"];
 
 const DEFAULT_VIEWERS: Profile[] = [
   { mode: "analyst", language: "en", club: null, player: null, metric: "speed" },
@@ -76,11 +75,23 @@ export default function App() {
     const m = secs >= p2 ? 45 + (secs - p2) / 60 : secs / 60;
     return `${Math.floor(m)}'`;
   };
+  // Replays play 8 s before the moment at 2x, show a banner, and restore the previous speed afterwards.
+  const [replayInfo, setReplayInfo] = useState<{ end: number; prevSpeed: number; armed: boolean } | null>(null);
   const replay = (at: number) => {
+    setReplayInfo({ end: at + 6, prevSpeed: replayInfo ? replayInfo.prevSpeed : speed, armed: false });
     send({ type: "seek", t: Math.max(0, at - 8) });
     send({ type: "speed", value: 2 });
     send({ type: "control", action: "play" });
   };
+  useEffect(() => {
+    if (!replayInfo || !state) return;
+    // Wait until the seek has landed (time before the end) before watching for the end of the replay.
+    if (!replayInfo.armed && state.t < replayInfo.end - 1) setReplayInfo({ ...replayInfo, armed: true });
+    else if (replayInfo.armed && state.t >= replayInfo.end) {
+      send({ type: "speed", value: replayInfo.prevSpeed });
+      setReplayInfo(null);
+    }
+  }, [state?.t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="app">
@@ -154,11 +165,6 @@ export default function App() {
           aria-label="Match time"
         />
         <span className="num">{clockLabel(duration)}</span>
-        <ol className="stages" aria-label="Pipeline stages">
-          {STAGES.map((s) => (
-            <li key={s}>{s}</li>
-          ))}
-        </ol>
       </div>
 
       {meta?.scenario && <p className="scenario-desc">{meta.scenario.description}</p>}
@@ -184,6 +190,8 @@ export default function App() {
               onProfile={(np) => setProfiles((ps) => ps.map((x, j) => (j === i ? np : x)))}
               onReplay={replay}
               onAsk={(q) => send({ type: "ask", viewer: i, question: q })}
+              layout={split ? "split" : "single"}
+              replaying={!!replayInfo}
             />
           ))}
         </main>

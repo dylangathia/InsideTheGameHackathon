@@ -10,6 +10,7 @@ interface Props {
   frames: React.MutableRefObject<FrameBuffer>;
   overlays: Overlay[];
   profile: Profile;
+  replaying?: boolean;
 }
 
 /** Overlays stay on screen for `ttl` seconds of wall time after they arrive, so they stay readable at 10x. */
@@ -17,7 +18,7 @@ function isActive(o: Overlay, now: number) {
   return o.receivedAt !== undefined && now - o.receivedAt < o.ttl * 1000;
 }
 
-export function Stage({ meta, state, frame, frames, overlays, profile }: Props) {
+export function Stage({ meta, state, frame, frames, overlays, profile, replaying }: Props) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [camOn, setCamOn] = useState(true);
   const camera = useRef<Camera>({ ...FULL_VIEW });
@@ -43,8 +44,15 @@ export function Stage({ meta, state, frame, frames, overlays, profile }: Props) 
   const positions = new Map(frame?.players.map((p) => [p[0], p]) ?? []);
   const dismiss = (id: string) => setDismissed((d) => new Set(d).add(id));
 
+  // A goal that just arrived makes the stage flash in the scoring team's colour for a moment.
+  const freshGoal = overlays.find((o) => o.kind === "goal" && o.receivedAt !== undefined && now - o.receivedAt < 2500);
+  const flashColor = freshGoal?.side ? meta.match[freshGoal.side].primary : undefined;
+
   return (
-    <div className="stage">
+    <div
+      className={`stage ${freshGoal ? "goal-flash" : ""} ${playerCam ? "cam-on" : ""}`}
+      style={flashColor ? ({ "--flash": flashColor } as React.CSSProperties) : undefined}
+    >
       <Pitch
         frames={frames}
         home={home}
@@ -72,8 +80,14 @@ export function Stage({ meta, state, frame, frames, overlays, profile }: Props) 
         </div>
       )}
 
+      {replaying && (
+        <div className="replay-banner" role="status">
+          Replay · 2×
+        </div>
+      )}
+
       {state && (
-        <div className="scorebug" role="status">
+        <div className={`scorebug ${freshGoal ? "pulse" : ""}`} role="status">
           <span className="sb-team" style={{ background: home.primary, color: home.secondary }}>{home.short}</span>
           <span className="sb-score">
             {state.score.home}–{state.score.away}

@@ -18,6 +18,8 @@ interface Props {
   onProfile: (p: Profile) => void;
   onReplay: (t: number) => void;
   onAsk: (q: string) => void;
+  layout: "single" | "split";
+  replaying: boolean;
 }
 
 const SUGGESTIONS: Record<Mode, string[]> = {
@@ -98,45 +100,34 @@ export function Viewer(props: Props) {
         )}
       </div>
 
-      <Stage meta={meta} state={state} frame={props.frame} frames={props.frames} overlays={overlays} profile={profile} />
-
-      {state && (
-        <div className={`panels panels-${profile.mode}`}>
-          {profile.mode === "analyst" && (
-            <>
-              <WinProbChart state={state} home={home} away={away} goals={goals} />
-              <Indices state={state} home={home} away={away} />
-              <StatsTable state={state} home={home} away={away} />
-              <Feed overlays={overlays} onReplay={props.onReplay} title="Commentary & key moments" />
-            </>
-          )}
-          {profile.mode === "casual" && (
-            <>
-              <div className="stack">
-                <WinChance state={state} home={home} away={away} />
-                <div className="card">
-                  <Momentum value={state.indices.momentum} home={home} away={away} big />
-                </div>
-              </div>
-              <Feed overlays={overlays.filter((o) => o.key || o.type === "ticker")} onReplay={props.onReplay} title="The story so far" />
-            </>
-          )}
-          {profile.mode === "player" && (
-            <>
-              <PlayerCard p={profile.player ? state.players[profile.player] : undefined} club={focusClub} />
-              <Feed
-                overlays={overlays.filter((o) => (profile.player && o.players.includes(profile.player)) || o.kind === "goal" || o.type === "ticker")}
-                onReplay={props.onReplay}
-                title="Their match"
-              />
-            </>
-          )}
-          {profile.mode === "metric" && (
-            <>
-              <MetricTracker metric={profile.metric} state={state} home={home} away={away} />
-              <Feed overlays={overlays} onReplay={props.onReplay} title="Moments" />
-            </>
-          )}
+      {(() => {
+        const stage = (
+          <Stage
+            meta={meta}
+            state={state}
+            frame={props.frame}
+            frames={props.frames}
+            overlays={overlays}
+            profile={profile}
+            replaying={props.replaying}
+          />
+        );
+        if (!state) return stage;
+        const feed =
+          profile.mode === "analyst" ? (
+            <Feed overlays={overlays} onReplay={props.onReplay} title="Commentary & key moments" />
+          ) : profile.mode === "casual" ? (
+            <Feed overlays={overlays.filter((o) => o.key || o.type === "ticker")} onReplay={props.onReplay} title="The story so far" />
+          ) : profile.mode === "player" ? (
+            <Feed
+              overlays={overlays.filter((o) => (profile.player && o.players.includes(profile.player)) || o.kind === "goal" || o.type === "ticker")}
+              onReplay={props.onReplay}
+              title="Their match"
+            />
+          ) : (
+            <Feed overlays={overlays} onReplay={props.onReplay} title="Moments" />
+          );
+        const ask = (
           <AskBox
             answers={props.answers}
             onAsk={props.onAsk}
@@ -145,8 +136,56 @@ export function Viewer(props: Props) {
             overlays={overlays}
             onReplay={props.onReplay}
           />
-        </div>
-      )}
+        );
+        const panels = (
+          <>
+            {profile.mode === "analyst" && (
+              <>
+                <WinProbChart state={state} home={home} away={away} goals={goals} />
+                <Indices state={state} home={home} away={away} />
+                <StatsTable state={state} home={home} away={away} />
+              </>
+            )}
+            {profile.mode === "casual" && (
+              <>
+                <WinChance state={state} home={home} away={away} />
+                <div className="card">
+                  <Momentum value={state.indices.momentum} home={home} away={away} big />
+                </div>
+              </>
+            )}
+            {profile.mode === "player" && (
+              <PlayerCard p={profile.player ? state.players[profile.player] : undefined} club={focusClub} />
+            )}
+            {profile.mode === "metric" && <MetricTracker metric={profile.metric} state={state} home={home} away={away} />}
+          </>
+        );
+        // Single view: broadcast layout, with the live feed and Ask beside the pitch so it all fits one screen.
+        if (props.layout === "single") {
+          return (
+            <>
+              <div className="viewer-main">
+                {stage}
+                <aside className="rail">
+                  {feed}
+                  {ask}
+                </aside>
+              </div>
+              <div className={`panels panels-${profile.mode}`}>{panels}</div>
+            </>
+          );
+        }
+        return (
+          <>
+            {stage}
+            <div className={`panels panels-${profile.mode}`}>
+              {panels}
+              {feed}
+              {ask}
+            </div>
+          </>
+        );
+      })()}
     </section>
   );
 }
@@ -155,7 +194,7 @@ export function Viewer(props: Props) {
 const stripIds = (text: string) =>
   text
     .replace(/\s*[[(]\s*i\d+(?:\s*[,;]\s*i\d+)*\s*[\])]/g, "")
-    .replace(/\s*i\d+/g, "")
+    .replace(/\s*\bi\d+\b/g, "")
     .replace(/\s+([.,;:])/g, "$1");
 
 function AskBox({ answers, onAsk, suggestions, provider, overlays, onReplay }: {
