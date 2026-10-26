@@ -20,7 +20,7 @@ from .explain import PERSONAS, NameContext, _language_name, reasons
 
 log = logging.getLogger(__name__)
 
-MOMENT_KINDS = ["goal", "big_chance", "red_card", "control_shift", "pressure_surge"]
+MOMENT_KINDS = ["goal", "big_chance", "red_card", "control_shift", "pressure_surge", "milestone"]
 PLAYER_METRICS = ["rating", "goals", "assists", "xg", "shots", "distance_km", "top_speed_kmh", "sprints",
                   "pass_accuracy_pct", "ball_wins", "pressures", "difficult_completed"]
 TREND_METRICS = ["win_probability", "control", "pressure", "momentum", "rhythm"]
@@ -149,6 +149,8 @@ class MatchTools:
             "distance_km": p["distance_km"], "top_speed_kmh": p["top_speed_kmh"], "sprints": p["sprints"],
             "cards": {"yellow": p["yellow"], "red": p["red"]},
             "rating": p["rating"],
+            # Totals including this match so far (season, club and career records are synthetic, like the match).
+            "records_incl_this_match": self.s.analyzer.history[p["id"]].to_dict(),
         }
 
     def get_player_stats(self, args: dict) -> dict:
@@ -200,6 +202,9 @@ class MatchTools:
                 moment["score_after"] = f"{f['score_after'][0]}-{f['score_after'][1]} ({self.ctx.team('home')} first)"
             elif ins["kind"] in ("big_chance", "red_card"):
                 moment["player"] = name(f.get("shooter") or f.get("player"))
+            elif ins["kind"] == "milestone":
+                moment["milestone"] = tr("en", f"ms_{f['code']}", player=name(f["player"]), n=f["n"],
+                                         team=self.ctx.team(ins["side"]))
             out.append(moment)
         return {"count": len(out), "moments": out[-15:]}
 

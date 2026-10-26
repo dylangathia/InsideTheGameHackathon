@@ -290,3 +290,9 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .board-who { display: block; color: var(--muted); font-size: 0.9em; }
 .board-shape { margin: 0; padding-top: 6px; border-top: 1px solid var(--line); color: #cfd8e5; }
 .board-panel.left { right: auto; left: 2.5cqw; top: calc(2.5cqw + 44px); }
+
+/* ---------- milestones */
+.small-milestone { border-left: 3px solid var(--accent); }
+.small-kicker { font-family: var(--font-mono); font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+.feed-milestone strong::before { content: "★ "; color: var(--accent); }
+.lower-ribbon { display: inline-block; margin-bottom: 4px; padding: 2px 8px; border-radius: 3px; background: var(--accent); color: #1b1300; font-family: var(--font-mono); font-weight: 600; font-size: clamp(11px, 1.5cqw, 13px); animation: rise 0.35s ease-out; }

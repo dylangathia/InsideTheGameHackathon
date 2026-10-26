@@ -65,7 +65,7 @@ export interface Overlay {
   insight_id: string;
   t: number;
   minute: string;
-  type: "key_moment" | "index_alert" | "player_tag" | "pass_card" | "shot_card" | "stat_panel" | "recap" | "ticker";
+  type: "key_moment" | "index_alert" | "player_tag" | "pass_card" | "shot_card" | "milestone" | "stat_panel" | "recap" | "ticker";
   kind: string;
   anchor: { kind: string; player_id?: string };
   ttl: number;

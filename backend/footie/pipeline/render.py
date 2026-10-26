@@ -9,7 +9,7 @@ Overlay contract (see docs/overlay-contract.md):
     t                match time in seconds (sync key with the video feed)
     minute           display label, e.g. "67'" or "45+2'"
     type             key_moment | index_alert | player_tag | pass_card |
-                     shot_card | stat_panel | recap | ticker
+                     shot_card | milestone | stat_panel | recap | ticker
     anchor           {"kind": "lower_third" | "lower_third_small" | "top_right" |
                       "player" | "side_panel" | "fullscreen" | "ticker",
                       "player_id": "<id>" (player anchors only)}
@@ -32,6 +32,7 @@ OVERLAY_SPEC: dict[str, tuple[str, str, float, int, list[str]]] = {
     "distance": ("player_tag", "player", 4, 1, ["distance"]),
     "difficult_pass": ("pass_card", "lower_third_small", 5, 2, ["pass_difficulty"]),
     "shot": ("shot_card", "lower_third_small", 6, 2, ["speed", "xg"]),
+    "milestone": ("milestone", "lower_third_small", 18, 3, []),  # outlasts the goal card it follows
     "stat_panel": ("stat_panel", "side_panel", 10, 2, []),
     "recap": ("recap", "fullscreen", 25, 5, []),
     "ticker": ("ticker", "ticker", 0, 1, []),

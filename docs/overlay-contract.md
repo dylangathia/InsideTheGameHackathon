@@ -18,7 +18,7 @@ Raw (unpersonalised) overlays for a whole match are in `data/<scenario>/overlays
 | `insight_id` | string | The interpreted fact this overlay comes from |
 | `t` | number | Match time in seconds since kick-off (continuous across halves). **The sync key** with the video feed. |
 | `minute` | string | Display label: `"67'"`, `"45+2'"` |
-| `type` | enum | `key_moment`, `index_alert`, `player_tag`, `pass_card`, `shot_card`, `stat_panel`, `recap`, `ticker` |
+| `type` | enum | `key_moment`, `index_alert`, `player_tag`, `pass_card`, `shot_card`, `milestone`, `stat_panel`, `recap`, `ticker` |
 | `kind` | string | The insight kind: `goal`, `big_chance`, `red_card`, `control_shift`, `pressure_surge`, `top_speed`, `sprint`, `distance`, `difficult_pass`, `shot`, `stat_panel`, `recap`, `ticker` |
 | `anchor.kind` | enum | `lower_third`, `lower_third_small`, `top_right`, `player`, `side_panel`, `fullscreen`, `ticker` |
 | `anchor.player_id` | string | For `player` anchors: track this player's position |

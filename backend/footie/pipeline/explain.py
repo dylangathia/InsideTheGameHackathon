@@ -95,6 +95,9 @@ def reasons(ins: dict, ctx: NameContext) -> list[Reason]:
             out.append(("r_fast_shot", {"speed": round(f["speed_kmh"])}))
         if f.get("minutes_left", 99) <= 10:
             out.append(("r_late", {"left": max(1, f["minutes_left"])}))
+        # A milestone is the story fans remember, so it goes straight after what the goal did to the score.
+        out[1:1] = [(f"ms_{m['code']}", {"player": ctx.player(f["scorer"]), "n": m["n"], "team": team})
+                    for m in f.get("milestones", [])]
     elif kind == "big_chance":
         out.append(("r_high_xg", {"xg": f"{f['xg']:.2f}", "pct": round(100 * f["xg"])}))
         if f.get("minutes_left", 99) <= 10:
@@ -109,6 +112,8 @@ def reasons(ins: dict, ctx: NameContext) -> list[Reason]:
             out.append(("r_completion_down", {"comp": f["completion_pct"]}))
         else:
             out.append(("r_completion_up", {"comp": f["completion_pct"]}))
+    elif kind == "milestone":
+        out.append((f"ms_{f['code']}", {"player": ctx.player(f["player"]), "n": f["n"], "team": team}))
     elif kind == "pressure_surge":
         out.append(("r_regains", {"hr": f["high_regains"]}))
         if f.get("chasing"):
@@ -182,6 +187,11 @@ def compose(ins: dict, profile, ctx: NameContext) -> dict:
     elif kind == "distance":
         headline = ctx.player(f["player"])
         body = tr(lang, "distance_b", km=f["km"])
+    elif kind == "milestone":
+        headline = tr(lang, f"ms_{f['code']}", player=ctx.player(f["player"]), n=f["n"], team=team)
+        sub = f"{tr(lang, 'ms_h')} · {ins['minute']}"
+        body = tr(lang, "ms_b", season=f["season"], sg=f["season_goals"], sa=f["season_assists"],
+                  cg=f["club_goals"], apps=f["club_apps"], team=team)
     elif kind == "difficult_pass":
         headline = tr(lang, "pass_h", player=ctx.player(f["passer"]), recipient=ctx.player(f["recipient"]))
         if analyst or profile.mode == "metric":
@@ -215,6 +225,8 @@ def compose(ins: dict, profile, ctx: NameContext) -> dict:
 
     prefix = _fan_prefix(ins, profile, ctx)
     why = rs if analyst else rs[:2]
+    if kind == "milestone":
+        why = []  # the headline already says it
     if prefix and profile.mode != "analyst":
         why = [prefix] + why
     return {"headline": headline, "sub": sub, "body": body, "why": why, "source": "template"}
