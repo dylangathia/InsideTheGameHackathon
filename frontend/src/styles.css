@@ -229,3 +229,15 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .verifier { margin-bottom: 6px; color: #cfd8e5; }
 .verifier strong { color: var(--good); font-weight: 600; }
 .verifier-fix { display: block; margin-top: 2px; padding-left: 10px; border-left: 2px solid var(--good); color: var(--muted); }
+
+/* ---------- player cam */
+.cam-hud { position: absolute; top: 2.5cqw; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: rgba(10, 14, 22, 0.9); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px 4px 10px; font-size: clamp(11px, 1.5cqw, 14px); white-space: nowrap; }
+.cam-tag { font-family: var(--font-mono); font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+.cam-hud strong { font-family: var(--font-display); font-size: 1.15em; letter-spacing: 0.02em; }
+.cam-legend { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 0.85em; }
+.cam-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-left: 4px; }
+.cam-legend .easy { background: #4cd38a; }
+.cam-legend .risky { background: #ffb547; }
+.cam-legend .hard { background: #ff5d5d; }
+.cam-hud button { font-size: 0.85em; padding: 1px 8px; }
+@media (max-width: 700px) { .cam-legend { display: none; } }

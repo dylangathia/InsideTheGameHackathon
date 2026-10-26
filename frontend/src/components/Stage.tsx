@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FrameBuffer } from "../useMatchStream";
 import type { Frame, MatchState, Meta, Overlay, Profile } from "../types";
-import { Pitch, toPct } from "./Pitch";
+import { type Camera, FULL_VIEW, Pitch, toPct } from "./Pitch";
 
 interface Props {
   meta: Meta;
@@ -19,6 +19,12 @@ function isActive(o: Overlay, now: number) {
 
 export function Stage({ meta, state, frame, frames, overlays, profile }: Props) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [camOn, setCamOn] = useState(true);
+  const camera = useRef<Camera>({ ...FULL_VIEW });
+  const focusInfo = profile.player
+    ? [meta.match.home, meta.match.away].flatMap((c) => c.players).find((p) => p.id === profile.player)
+    : undefined;
+  const playerCam = profile.mode === "player" && !!focusInfo && camOn;
   const now = performance.now();
   const active = overlays.filter((o) => o.ttl > 0 && isActive(o, now) && !dismissed.has(o.id));
   const pick = (type: Overlay["type"], n: number) =>
@@ -39,7 +45,32 @@ export function Stage({ meta, state, frame, frames, overlays, profile }: Props) 
 
   return (
     <div className="stage">
-      <Pitch frames={frames} home={home} away={away} focusPlayer={profile.player} favClub={profile.club} />
+      <Pitch
+        frames={frames}
+        home={home}
+        away={away}
+        focusPlayer={profile.player}
+        favClub={profile.club}
+        playerCam={playerCam}
+        camera={camera}
+      />
+
+      {profile.mode === "player" && focusInfo && (
+        <div className="cam-hud">
+          <span className="cam-tag">{playerCam ? "Player cam" : "Full pitch"}</span>
+          <strong>
+            #{focusInfo.number} {focusInfo.short}
+          </strong>
+          {playerCam && (
+            <span className="cam-legend" aria-label="Pass option colours">
+              <i className="easy" /> easy <i className="risky" /> risky <i className="hard" /> hard pass
+            </span>
+          )}
+          <button onClick={() => setCamOn(!camOn)} aria-pressed={playerCam}>
+            {playerCam ? "Full pitch" : "Player cam"}
+          </button>
+        </div>
+      )}
 
       {state && (
         <div className="scorebug" role="status">
@@ -56,7 +87,8 @@ export function Stage({ meta, state, frame, frames, overlays, profile }: Props) 
         const pid = o.anchor.player_id;
         const p = pid ? positions.get(pid) : undefined;
         if (!p) return null;
-        const pos = toPct(p[1], p[2]);
+        const pos = toPct(p[1], p[2], camera.current);
+        if (pos.left < 2 || pos.left > 98 || pos.top < 4 || pos.top > 100) return null; // off-screen while zoomed
         return (
           <div key={o.id} className={`tag tag-${o.kind}`} style={{ left: `${pos.left}%`, top: `${pos.top}%` }}>
             <strong>{o.text.headline}</strong>
