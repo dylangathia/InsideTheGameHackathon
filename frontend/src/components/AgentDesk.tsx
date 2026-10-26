@@ -10,7 +10,12 @@ const AGENTS: { id: AgentEvent["agent"]; name: string; role: string }[] = [
 const ACTIVE_MS = 4000;
 
 /** The agents' handoffs as they happen: who did what, and what the Verifier caught. */
-export function AgentDesk({ events, framework }: { events: AgentEvent[]; framework: boolean }) {
+export function AgentDesk({ events, framework, onShow, showPending }: {
+  events: AgentEvent[];
+  framework: boolean;
+  onShow?: () => void;
+  showPending?: boolean;
+}) {
   const now = performance.now();
   const recent = [...events].reverse().slice(0, 5);
   return (
@@ -19,6 +24,11 @@ export function AgentDesk({ events, framework }: { events: AgentEvent[]; framewo
         <span>Agent desk</span>
         <span className="hint">{framework ? "live handoffs · Microsoft Agent Framework" : "live handoffs"}</span>
       </div>
+      {onShow && (
+        <button className="show-btn" onClick={onShow} disabled={showPending}>
+          {showPending ? "The Pundit is preparing the half-time show…" : "▶ Half-time show, presented by the Pundit"}
+        </button>
+      )}
       <div className="desk-roster">
         {AGENTS.map((a) => {
           const busy = events.some((e) => e.agent === a.id && e.receivedAt !== undefined && now - e.receivedAt < ACTIVE_MS);

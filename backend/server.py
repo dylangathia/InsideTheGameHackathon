@@ -34,6 +34,7 @@ load_dotenv()
 from footie.i18n import LANGUAGES, LLM_ONLY_LANGUAGES  # noqa: E402
 from footie.pipeline import orchestration  # noqa: E402
 from footie.pipeline.agent import ask_agent  # noqa: E402
+from footie.pipeline.pundit import build_show  # noqa: E402
 from footie.pipeline.explain import Narrator  # noqa: E402
 from footie.pipeline.ingest import FabricEventstreamSink  # noqa: E402
 from footie.pipeline.personalize import METRICS, MODES, Profile  # noqa: E402
@@ -115,6 +116,9 @@ def _meta_message(scenario: str, m) -> dict:
     }
 
 
+SHOWS: dict[tuple, dict] = {}  # half-time shows by (scenario, profile): the first half never changes
+
+
 class Connection:
     """One browser connection: a shared match clock and 1-2 viewer profiles."""
 
@@ -173,6 +177,22 @@ class Connection:
         if text:
             await self.send({"type": "overlay_text", "viewer": vi, "id": p["id"], "text": text})
 
+    async def halftime_show(self, vi: int, prof: Profile) -> None:
+        """The Pundit's half-time show, from a session stopped at the half-time whistle."""
+        key = (self.scenario, prof.mode, prof.language, prof.club, prof.player, prof.metric)
+        on_step = self.desk(vi)
+        show = SHOWS.get(key)
+        if show is None:
+            m = self.session.match
+            ht = MatchSession(m)  # no Fabric sink: these events were already streamed
+            await run_in_threadpool(ht.advance_to, m.period_ends[0] + 0.5)
+            show = await build_show(NARRATOR.llm, ht, prof, on_step=on_step)
+            if show["source"] == "llm":
+                SHOWS[key] = show
+        else:
+            on_step("pundit", "presenting", show["title"])
+        await self.send({"type": "show", "viewer": vi, "show": show})
+
     async def send_history(self) -> None:
         s = self.session
         for vi, prof in enumerate(self.viewers):
@@ -209,6 +229,10 @@ class Connection:
             self.speed = max(0.5, min(120.0, float(msg.get("value", 10))))
         elif kind == "seek":
             await self.reset_to(float(msg.get("t", 0)))
+        elif kind == "show":
+            vi = int(msg.get("viewer", 0))
+            if self.session.match.period_ends:
+                self.spawn(self.halftime_show(vi, self.viewers[vi] if vi < len(self.viewers) else Profile()))
         elif kind == "ask":
             vi = int(msg.get("viewer", 0))
             prof = self.viewers[vi] if vi < len(self.viewers) else Profile()

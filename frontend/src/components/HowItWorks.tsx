@@ -9,8 +9,8 @@ const STAGES = [
 ];
 
 const TECH = [
-  ["Microsoft Agent Framework", "Three agents: Narrator and Verifier (a workflow with one rewrite loop) and the Ask the match analyst with six tools"],
-  ["Microsoft Foundry", "The model behind all three agents (gpt-4.1-mini)"],
+  ["Microsoft Agent Framework", "Four agents: Narrator and Verifier (a workflow with one rewrite loop), the Ask the match analyst with six tools, and the Pundit who presents the half-time show"],
+  ["Microsoft Foundry", "The model behind all four agents (gpt-4.1-mini)"],
   ["Microsoft Fabric", "Every event streams to an Eventhouse for live KQL queries"],
   ["Azure Container Apps", "This live app, deployed from GitHub Actions"],
   ["GitHub", "Public repo, CI on every push, container image builds"],

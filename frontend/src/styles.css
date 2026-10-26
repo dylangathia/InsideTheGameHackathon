@@ -316,3 +316,22 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .act-flagged .desk-action { color: #ffb547; } .act-rejected .desk-action { color: #ff5d5d; } .act-passed .desk-action { color: var(--verifier); }
 .desk-detail { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .rail .desk { flex: none; }
+
+/* ---------- half-time show */
+.show-btn { width: 100%; margin: 2px 0 8px; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; cursor: pointer; }
+.show-btn:disabled { opacity: 0.7; cursor: progress; animation: desk-pulse-bg 1.4s ease-in-out infinite; }
+@keyframes desk-pulse-bg { 50% { background: color-mix(in srgb, var(--accent) 30%, transparent); } }
+.recap .show-btn { margin-top: 10px; }
+.show-talk { margin: 0; padding: 8px 10px; border-left: 3px solid #ffb547; background: rgba(255, 181, 71, 0.1); border-radius: 4px; font-size: 1.05em; line-height: 1.35; color: #f3f6fa; }
+.show-who { display: block; font-family: var(--font-mono); font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.08em; color: #ffb547; margin-bottom: 3px; }
+.board-panel.on-show .board-steps { font-size: 0.9em; }
+.show-controls { display: flex; align-items: center; gap: 6px; margin-top: auto; }
+.show-controls button:last-child { margin-left: auto; }
+.show-dots { display: flex; gap: 4px; }
+.show-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.show-dots i.on { background: #ffb547; }
+.show-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(70%, 560px); background: rgba(10, 14, 22, 0.95); border-top: 3px solid #ffb547; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; font-size: clamp(12px, 1.6cqw, 15px); animation: rise 0.35s ease-out; }
+.board-panel.on-show .board-who { display: none; }
+.board-panel.on-show .board-steps { gap: 2px; }
+.board-panel.on-show .board-head { font-size: 1.2em; }
+.board-panel .show-controls { position: sticky; bottom: -10px; padding: 6px 0 2px; background: rgba(10, 14, 22, 0.98); }

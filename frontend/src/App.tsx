@@ -187,6 +187,8 @@ export default function App() {
               overlays={views[i]?.overlays ?? []}
               answers={views[i]?.answers ?? []}
               desk={views[i]?.desk ?? []}
+              show={views[i]?.show ?? null}
+              onShow={() => send({ type: "show", viewer: i })}
               profile={p}
               onProfile={(np) => setProfiles((ps) => ps.map((x, j) => (j === i ? np : x)))}
               onReplay={replay}

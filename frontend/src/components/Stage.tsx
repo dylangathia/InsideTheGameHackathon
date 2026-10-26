@@ -13,6 +13,35 @@ interface Props {
   replaying?: boolean;
   board?: Breakdown | null;
   onCloseBoard?: () => void;
+  show?: ShowView | null;
+  onShow?: () => void;
+}
+
+/** What the stage needs to present one step of the half-time show. */
+export interface ShowView {
+  title: string;
+  idx: number;
+  total: number;
+  talk: string | null; // the pundit's words for this moment
+  minute: string;
+  closing: string | null; // set on the final card
+  ai: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+  onClose: () => void;
+}
+
+function ShowControls({ show }: { show: ShowView }) {
+  return (
+    <div className="show-controls">
+      <button onClick={show.onPrev} disabled={show.idx === 0} aria-label="Previous moment">◀</button>
+      <span className="show-dots">
+        {Array.from({ length: show.total + 1 }, (_, i) => <i key={i} className={i === show.idx ? "on" : ""} />)}
+      </span>
+      {show.closing === null && <button onClick={show.onNext} aria-label="Next moment">▶</button>}
+      <button onClick={show.onClose}>Back to the match</button>
+    </div>
+  );
 }
 
 /** Overlays stay on screen for `ttl` seconds of wall time after they arrive, so they stay readable at 10x. */
@@ -20,7 +49,7 @@ function isActive(o: Overlay, now: number) {
   return o.receivedAt !== undefined && now - o.receivedAt < o.ttl * 1000;
 }
 
-export function Stage({ meta, state, frame, frames, overlays, profile, replaying, board, onCloseBoard }: Props) {
+export function Stage({ meta, state, frame, frames, overlays, profile, replaying, board, onCloseBoard, show, onShow }: Props) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [camOn, setCamOn] = useState(true);
   const camera = useRef<Camera>({ ...FULL_VIEW });
@@ -72,8 +101,19 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
       />
 
       {board && (
-        <aside className={`board-panel ${boardSide(board) === "left" ? "left" : ""}`} aria-label="Tactical breakdown">
-          <div className="board-kicker">Breakdown · {board.team}</div>
+        <aside className={`board-panel ${boardSide(board) === "left" ? "left" : ""} ${show ? "on-show" : ""}`} aria-label="Tactical breakdown">
+          {show && (
+            <>
+              <div className="board-kicker">
+                Half-time show · {show.idx + 1}/{show.total} · {show.minute}
+              </div>
+              <blockquote className="show-talk">
+                <span className="show-who">Pundit{show.ai ? " · AI · verified" : ""}</span>
+                {show.talk}
+              </blockquote>
+            </>
+          )}
+          {!show && <div className="board-kicker">Breakdown · {board.team}</div>}
           <div className="board-head">{board.headline}</div>
           <ol className="board-steps">
             {board.steps.map((st) => (
@@ -97,8 +137,22 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
               {board.shape.box.attackers === 1 ? "" : "s"} in the box.
             </p>
           )}
-          <button onClick={onCloseBoard}>Close breakdown</button>
+          {show ? <ShowControls show={show} /> : <button onClick={onCloseBoard}>Close breakdown</button>}
         </aside>
+      )}
+
+      {show && !board && (
+        <div className="show-card" role="dialog" aria-label="Half-time show">
+          <div className="board-kicker">
+            {show.closing !== null ? "Half-time show · second half" : `Half-time show · ${show.idx + 1}/${show.total} · ${show.minute}`}
+          </div>
+          <div className="board-head">{show.title}</div>
+          <blockquote className="show-talk">
+            <span className="show-who">Pundit{show.ai ? " · AI · verified" : ""}</span>
+            {show.closing ?? show.talk}
+          </blockquote>
+          <ShowControls show={show} />
+        </div>
       )}
 
       {profile.mode === "player" && focusInfo && (
@@ -206,6 +260,18 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
             <div className="recap-score">{recap.text.sub}</div>
             <p>{recap.text.body}</p>
             {recap.rows && <StatRows rows={recap.rows} home={home.short} away={away.short} />}
+            {onShow && !state?.finished && (
+              <button
+                className="show-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dismiss(recap.id);
+                  onShow();
+                }}
+              >
+                ▶ Watch the half-time show, presented by the Pundit
+              </button>
+            )}
             <AiBadge o={recap} />
           </div>
         </div>

@@ -80,6 +80,9 @@ export function useMatchStream(scenario: string, viewers: Profile[], initialSpee
             desk: [...v.desk, { ...msg.event, receivedAt: performance.now() }].slice(-40),
           })));
           break;
+        case "show":
+          setViews((vs) => updateViewer(vs, msg.viewer, (v) => ({ ...v, show: { ...msg.show, receivedAt: performance.now() } })));
+          break;
         case "answer":
           setViews((vs) => updateViewer(vs, msg.viewer, (v) => ({
             ...v,

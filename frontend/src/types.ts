@@ -218,6 +218,17 @@ export interface ViewerData {
   overlays: Overlay[];
   answers: Answer[];
   desk: AgentEvent[];
+  show?: Show | null;
+}
+
+/** The Pundit's half-time show: 2-3 moments, each with its breakdown and what the pundit says over it. */
+export interface Show {
+  title: string;
+  segments: { moment_id: string; minute: string; kind: string; t: number; talk: string; breakdown: Breakdown | null }[];
+  closing: string;
+  source: "llm" | "template";
+  verification: string;
+  receivedAt?: number;
 }
 
 /** One step by one agent, streamed live for the agent desk. */
