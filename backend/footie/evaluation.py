@@ -28,9 +28,62 @@ PROFILES = [
 ]
 
 
+def _sabotage(ins: dict, session) -> list[tuple[str, Profile, dict]]:
+    """Wrong versions of a goal's narration, each with one planted error and no numbers (so only the AI check can
+    catch them), plus the viewer profile each is aimed at."""
+    ctx, f, side = session.ctx, ins["facts"], ins["side"]
+    other = "away" if side == "home" else "home"
+    scorer, team, rival = ctx.full_names[f["scorer"]], ctx.team(side), ctx.team(other)
+    rival_player = ctx.full_names[next(p.id for p in session.match.club(other).starters if p.position == "ST")]
+    rival_short = session.match.club(other).short
+    neutral = Profile(mode="analyst", language="en")
+    return [
+        ("goal credited to the wrong club", neutral,
+         {"headline": f"Goal for {rival}!", "body": f"{scorer} scores for {rival} and the away end erupts."}),
+        ("wrong scorer", neutral,
+         {"headline": f"Goal! {rival_player} scores", "body": f"{rival_player} finishes it off for {team}."}),
+        ("says the match is over", neutral,
+         {"headline": f"{team} have won it", "body": f"That's full time: {scorer}'s goal wins the match for {team}."}),
+        ("good news framed for the wrong fans", Profile(mode="casual", language="en", club=rival_short),
+         {"headline": f"Brilliant news for {rival} fans!", "body": f"{scorer} scores and {rival} supporters are celebrating."}),
+    ]
+
+
+async def sabotage_test(narrator: Narrator) -> dict:
+    """Plant known errors in goal narrations and count how many the Verifier catches; clean template text as control."""
+    cases = []
+    for sid in SCENARIOS:
+        session = MatchSession(load_match(sid))
+        session.run_to_end()
+        for ins in (i for i in session.insights.values() if i["kind"] == "goal"):
+            ov = next(o for o in session.overlays if o["insight_id"] == ins["id"])
+            for error, prof, out in _sabotage(ins, session):
+                cases.append((error, ins, prof, session, out))
+            clean = session.personalize(ov, Profile(mode="analyst", language="en"))["text"]
+            cases.append(("clean template text (control)", ins, Profile(mode="analyst", language="en"), session,
+                          {"headline": clean["headline"], "body": " ".join([clean.get("body", ""), *clean["why"]])}))
+
+    async def run(case):
+        error, ins, prof, session, out = case
+        draft = session.personalize(next(o for o in session.overlays if o["insight_id"] == ins["id"]), prof)["text"]
+        payload = narrator.payload(ins, prof, session.ctx, draft)
+        problems = await narrator.check(ins, prof, session.ctx, out, payload, draft)
+        if problems == ["verifier unavailable"]:
+            return error, None
+        return error, bool(problems)
+
+    results = await asyncio.gather(*[run(c) for c in cases])
+    by: dict[str, list[bool]] = {}
+    for error, caught in results:
+        if caught is not None:
+            by.setdefault(error, []).append(caught)
+    return by
+
+
 async def evaluate(narrator: Narrator) -> dict:
     rows = []
     started = time.time()
+    narrator.llm.sem = asyncio.Semaphore(2)  # stay under the deployment's tokens-per-minute quota
     for sid in SCENARIOS:
         match = load_match(sid)
         session = MatchSession(match)
@@ -56,11 +109,19 @@ async def evaluate(narrator: Narrator) -> dict:
             else:
                 status = out["verification"]["status"]
                 problems = out["verification"].get("problems_fixed", [])
+            # An unreachable Verifier is a network failure, not a catch: count it with the errors (or as a pass,
+            # if the retry was verified).
+            if any("verifier unavailable" in p for p in problems):
+                if status == "rejected":
+                    status, problems = "error", []
+                elif status == "passed_after_rewrite" and all("verifier unavailable" in p for p in problems):
+                    status, problems = "passed", []
             return {"scenario": sid_, "profile": label_, "kind": ins_["kind"], "minute": ins_["minute"],
                     "status": status, "problems": problems}
 
         rows += await asyncio.gather(*[run(j) for j in jobs])
-    return {"rows": rows, "seconds": round(time.time() - started), "model": narrator.llm.model,
+    sabotage = await sabotage_test(narrator)
+    return {"rows": rows, "sabotage": sabotage, "seconds": round(time.time() - started), "model": narrator.llm.model,
             "provider": narrator.llm.provider, "agent_framework": orchestration.enabled(narrator.llm)}
 
 
@@ -111,6 +172,25 @@ def report(result: dict) -> str:
         rs = [r for r in rows if r["profile"] == label]
         pc = Counter(r["status"] for r in rs)
         lines.append(f"| {label} | {len(rs)} | {pc['passed']} | {pc['passed_after_rewrite']} | {pc['rejected']} |")
+    sab = result.get("sabotage") or {}
+    if sab:
+        planted = {k: v for k, v in sab.items() if "control" not in k}
+        hits = sum(sum(v) for v in planted.values())
+        n = sum(len(v) for v in planted.values())
+        lines += ["", "## Sabotage test: does the Verifier catch planted errors?", "",
+                  "For every goal in the three matches we wrote wrong versions of the narration, each with one planted "
+                  "error and no numbers, so only the AI fact-check (not the number check) can catch it. Clean template "
+                  "text is the control: it should pass.", "",
+                  "| Planted error | Caught |", "|---|---|"]
+        for k, v in sab.items():
+            if "control" in k:
+                continue
+            lines.append(f"| {k[0].upper() + k[1:]} | {sum(v)} of {len(v)} |")
+        lines.append(f"| **All planted errors** | **{hits} of {n} ({100 * hits / max(1, n):.0f}%)** |")
+        for k, v in sab.items():
+            if "control" in k:
+                lines += ["", f"Control: {len(v) - sum(v)} of {len(v)} clean template narrations passed "
+                              f"({sum(v)} flagged as false alarms)."]
     caught = [r for r in rows if r["problems"]]
     lines += ["", "## What the Verifier caught", ""]
     if not caught:

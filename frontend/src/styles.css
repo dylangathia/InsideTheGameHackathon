@@ -296,3 +296,42 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .small-kicker { font-family: var(--font-mono); font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
 .feed-milestone strong::before { content: "★ "; color: var(--accent); }
 .lower-ribbon { display: inline-block; margin-bottom: 4px; padding: 2px 8px; border-radius: 3px; background: var(--accent); color: #1b1300; font-family: var(--font-mono); font-weight: 600; font-size: clamp(11px, 1.5cqw, 13px); animation: rise 0.35s ease-out; }
+
+/* ---------- agent desk */
+.desk { --narrator: #7cc4ff; --verifier: #4ade80; --analyst: #c4a7ff; --pundit: #ffb547; }
+.desk-roster { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.desk-agent { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.desk-agent i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.5; }
+.desk-agent.desk-narrator { color: var(--narrator); } .desk-agent.desk-verifier { color: var(--verifier); }
+.desk-agent.desk-analyst { color: var(--analyst); } .desk-agent.desk-pundit { color: var(--pundit); }
+.desk-agent.busy { border-color: currentColor; background: color-mix(in srgb, currentColor 14%, transparent); }
+.desk-agent.busy i { opacity: 1; animation: desk-pulse 0.9s ease-in-out infinite; }
+@keyframes desk-pulse { 50% { transform: scale(1.6); opacity: 0.4; } }
+.desk-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.desk-log li { display: flex; gap: 6px; align-items: baseline; font-size: 12.5px; min-width: 0; animation: slide-right 0.25s ease-out; }
+.desk-log b { font-weight: 600; flex: none; }
+.desk-log .desk-narrator b { color: var(--narrator); } .desk-log .desk-verifier b { color: var(--verifier); }
+.desk-log .desk-analyst b { color: var(--analyst); } .desk-log .desk-pundit b { color: var(--pundit); }
+.desk-action { flex: none; color: #cfd8e5; }
+.act-flagged .desk-action { color: #ffb547; } .act-rejected .desk-action { color: #ff5d5d; } .act-passed .desk-action { color: var(--verifier); }
+.desk-detail { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.rail .desk { flex: none; }
+
+/* ---------- half-time show */
+.show-btn { width: 100%; margin: 2px 0 8px; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; cursor: pointer; }
+.show-btn:disabled { opacity: 0.7; cursor: progress; animation: desk-pulse-bg 1.4s ease-in-out infinite; }
+@keyframes desk-pulse-bg { 50% { background: color-mix(in srgb, var(--accent) 30%, transparent); } }
+.recap .show-btn { margin-top: 10px; }
+.show-talk { margin: 0; padding: 8px 10px; border-left: 3px solid #ffb547; background: rgba(255, 181, 71, 0.1); border-radius: 4px; font-size: 1.05em; line-height: 1.35; color: #f3f6fa; }
+.show-who { display: block; font-family: var(--font-mono); font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.08em; color: #ffb547; margin-bottom: 3px; }
+.board-panel.on-show .board-steps { font-size: 0.9em; }
+.show-controls { display: flex; align-items: center; gap: 6px; margin-top: auto; }
+.show-controls button:last-child { margin-left: auto; }
+.show-dots { display: flex; gap: 4px; }
+.show-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.show-dots i.on { background: #ffb547; }
+.show-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(70%, 560px); background: rgba(10, 14, 22, 0.95); border-top: 3px solid #ffb547; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; font-size: clamp(12px, 1.6cqw, 15px); animation: rise 0.35s ease-out; }
+.board-panel.on-show .board-who { display: none; }
+.board-panel.on-show .board-steps { gap: 2px; }
+.board-panel.on-show .board-head { font-size: 1.2em; }
+.board-panel .show-controls { position: sticky; bottom: -10px; padding: 6px 0 2px; background: rgba(10, 14, 22, 0.98); }

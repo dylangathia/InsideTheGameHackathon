@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FrameBuffer } from "../useMatchStream";
-import type { Answer, Frame, MatchState, Meta, Mode, Overlay, Profile } from "../types";
+import type { AgentEvent, Show, Answer, Frame, MatchState, Meta, Mode, Overlay, Profile } from "../types";
 import { LANGUAGES, LLM_LANGUAGES, METRICS, MODES } from "../types";
+import { AgentDesk } from "./AgentDesk";
 import { Feed, Indices, MetricTracker, Momentum, PlayerCard, StatsTable, WinChance, WinProbChart } from "./Panels";
 import { Stage } from "./Stage";
 
@@ -14,6 +15,9 @@ interface Props {
   frames: React.MutableRefObject<FrameBuffer>;
   overlays: Overlay[];
   answers: Answer[];
+  desk: AgentEvent[];
+  show: Show | null;
+  onShow: () => void;
   profile: Profile;
   onProfile: (p: Profile) => void;
   onReplay: (t: number) => void;
@@ -39,6 +43,54 @@ export function Viewer(props: Props) {
   const languages = meta.llm ? { ...LANGUAGES, ...LLM_LANGUAGES } : LANGUAGES;
   // Tactical breakdown: freeze the match at the shot and draw the move on the pitch.
   const [board, setBoard] = useState<Overlay | null>(null);
+  // The Pundit's half-time show: freeze on each moment in turn, draw its breakdown, caption it with the pundit.
+  const [showPending, setShowPending] = useState(false);
+  const [run, setRun] = useState<{ show: Show; idx: number; resumeT: number } | null>(null);
+  const htDone = !!state && meta.match.period_ends.length > 0 && state.t >= meta.match.period_ends[0];
+  const requestShow = () => {
+    setShowPending(true);
+    props.onShow();
+  };
+  const goTo = (show: Show, idx: number, resumeT: number) => {
+    setBoard(null);
+    if (idx < show.segments.length) props.onFreeze(show.segments[idx].t);
+    setRun({ show, idx, resumeT });
+  };
+  const endShow = () => {
+    if (run) props.onFreeze(run.resumeT);
+    setRun(null);
+  };
+  useEffect(() => {
+    if (!props.show) return;
+    setShowPending(false);
+    goTo(props.show, 0, state?.t ?? 0);
+    // a new show object means a new request; state.t is read once, when it starts
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.show]);
+  useEffect(() => {
+    if (!run || run.idx >= run.show.segments.length) return;
+    const seg = run.show.segments[run.idx];
+    const ms = 6000 + (seg.breakdown?.steps.length ?? 0) * 650 + seg.talk.split(" ").length * 120;
+    const timer = setTimeout(() => goTo(run.show, run.idx + 1, run.resumeT), ms);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run]);
+  const segment = run && run.idx < run.show.segments.length ? run.show.segments[run.idx] : null;
+  const showView = run
+    ? {
+        title: run.show.title,
+        idx: run.idx,
+        total: run.show.segments.length,
+        talk: segment?.talk ?? null,
+        minute: segment?.minute ?? "",
+        closing: segment ? null : run.show.closing,
+        ai: run.show.source === "llm",
+        onPrev: () => goTo(run.show, Math.max(0, run.idx - 1), run.resumeT),
+        onNext: () => goTo(run.show, run.idx + 1, run.resumeT),
+        onClose: endShow,
+      }
+    : null;
+
   const openBoard = (o: Overlay) => {
     if (!o.grounding?.breakdown) return;
     setBoard(o);
@@ -118,8 +170,10 @@ export function Viewer(props: Props) {
             overlays={overlays}
             profile={profile}
             replaying={props.replaying}
-            board={board?.grounding?.breakdown ?? null}
+            board={segment ? segment.breakdown : (board?.grounding?.breakdown ?? null)}
             onCloseBoard={() => setBoard(null)}
+            show={showView}
+            onShow={htDone ? requestShow : undefined}
           />
         );
         if (!state) return stage;
@@ -146,6 +200,14 @@ export function Viewer(props: Props) {
             provider={meta.llm ? (meta.agent_framework ? `Agent Framework + ${meta.llm_provider}` : meta.llm_provider) : null}
             overlays={overlays}
             onReplay={props.onReplay}
+          />
+        );
+        const desk = (
+          <AgentDesk
+            events={props.desk}
+            framework={!!meta.agent_framework}
+            onShow={htDone ? requestShow : undefined}
+            showPending={showPending}
           />
         );
         const panels = (
@@ -179,6 +241,7 @@ export function Viewer(props: Props) {
                 {stage}
                 <aside className="rail">
                   {feed}
+                  {desk}
                   {ask}
                 </aside>
               </div>
@@ -192,6 +255,7 @@ export function Viewer(props: Props) {
             <div className={`panels panels-${profile.mode}`}>
               {panels}
               {feed}
+              {desk}
               {ask}
             </div>
           </>

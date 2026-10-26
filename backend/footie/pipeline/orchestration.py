@@ -1,12 +1,13 @@
 """The agents on Microsoft Agent Framework.
 
-Three agents, each an Agent Framework `Agent` on the same Foundry deployment:
+Four agents, each an Agent Framework `Agent` on the same Foundry deployment:
 
     narrator       writes the on-screen text for a key moment from the computed facts
-    verifier       fact-checks the narrator's draft (after a deterministic number check in software)
+    verifier       fact-checks the narrator's draft and the pundit's script (after a deterministic number check)
     match_analyst  answers "Ask the match" questions with six read-only tools over the live match
+    pundit         presents the half-time show: picks the moments that decided the half, with their breakdowns
 
-The narrator and verifier are wired together as an Agent Framework `Workflow`:
+The narrator and verifier (and the pundit and verifier) are wired together as an Agent Framework `Workflow`:
 
     Request --> [narrator] --Draft--> [verifier] --pass--> output (verified text)
                     ^                     |
@@ -133,8 +134,9 @@ async def narrate_and_verify(payload: dict, write: Write, check: Check) -> Outco
 
 # ---------------------------------------------------------------------------- match analyst
 async def run_match_analyst(llm, system: str, question: str, specs: list[dict],
-                            call_tool: Callable[[str, dict], dict], max_steps: int) -> str:
-    """The "Ask the match" agent: Agent Framework runs the tool loop over our read-only match tools."""
+                            call_tool: Callable[[str, dict], dict], max_steps: int,
+                            name: str = "match_analyst", max_tokens: int = 500) -> str:
+    """A tool-using agent ("Ask the match", or the half-time Pundit): Agent Framework runs the tool loop."""
     tools = []
     for spec in specs:
         fn = spec["function"]
@@ -144,7 +146,7 @@ async def run_match_analyst(llm, system: str, question: str, specs: list[dict],
 
         tools.append(FunctionTool(name=fn["name"], description=fn["description"], func=invoke,
                                   input_model=fn["parameters"]))
-    agent = Agent(_client(llm, max_iterations=max_steps), system, name="match_analyst", tools=tools)
+    agent = Agent(_client(llm, max_iterations=max_steps), system, name=name, tools=tools)
     async with llm.sem:
-        resp = await agent.run(question, options={"max_tokens": 500, "temperature": 0.2})
+        resp = await agent.run(question, options={"max_tokens": max_tokens, "temperature": 0.2})
     return (resp.text or "").strip()

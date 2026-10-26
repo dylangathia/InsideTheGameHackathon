@@ -67,6 +67,14 @@ TOOLS = [
          **_minute_range}, ["type"]),
 ]
 
+# The Pundit also gets the tactical breakdown of a goal or big chance (the move step by step and the defending shape).
+BREAKDOWN_TOOL = _fn("get_breakdown", "The tactical breakdown of a goal or big chance: how the move was built step by step "
+                     "(where the ball was won, each pass and carry, the shot) and the defending team's shape at the shot.",
+                     {"moment_id": {"type": "string", "description": "Moment id from find_moments, e.g. 'i118'"}},
+                     ["moment_id"])
+PUNDIT_TOOLS = TOOLS + [BREAKDOWN_TOOL]
+TOOL_NAMES = {t["function"]["name"] for t in PUNDIT_TOOLS}
+
 AGENT_PROMPT = """You are the live match analyst inside a football broadcast companion app.
 Answer the viewer's question about the match in progress (now at {minute}).
 - Get facts with the tools. Never guess a number, name or event. If the tools cannot answer, say so.
@@ -249,9 +257,28 @@ class MatchTools:
             counts[self.ctx.team(e["side"])] += 1
         return {"type": args.get("type"), "filters": {k: v for k, v in args.items() if k != "type"}, "counts": counts}
 
+    def get_breakdown(self, args: dict) -> dict:
+        mid = str(args.get("moment_id", "")).strip()
+        if mid not in self.s.insights:
+            return {"error": f"No moment {mid}. Use an id from find_moments."}
+        board = self.s.grounding(mid).get("breakdown")
+        if not board:
+            return {"error": "Breakdowns exist only for goals and big chances."}
+        self.cited_ids.add(mid)
+        shape = board["shape"]
+        return {
+            "moment_id": mid, "headline": board["headline"], "team": board["team"],
+            "steps": [" ".join(x for x in (f"{st['n']}. {st['label']}", f"({st['detail']})" if st.get("detail") else "",
+                                           f"{st['player']}" + (f" to {st['to']}" if st.get("to") else ""))
+                               if x) for st in board["steps"]],
+            "defending": (f"{shape['team']} ({shape['formation']}): back line {shape['back_line_m']} m from goal, "
+                          f"{shape['box']['defenders']} defenders v {shape['box']['attackers']} attackers in the box")
+            if shape else None,
+        }
+
     def run(self, name: str, args: dict) -> dict:
         fn = getattr(self, name, None)
-        if name not in {t["function"]["name"] for t in TOOLS} or fn is None:
+        if name not in TOOL_NAMES or fn is None:
             return {"error": f"Unknown tool {name}"}
         try:
             return fn(args or {})
@@ -265,7 +292,7 @@ def _step_label(name: str, args: dict) -> str:
     return f"{name}({shown})"
 
 
-async def ask_agent(llm, question: str, session, profile, max_steps: int = 5) -> dict:
+async def ask_agent(llm, question: str, session, profile, max_steps: int = 5, on_step=None) -> dict:
     """Run the tool loop. Returns {answer, cites, steps, source}."""
     tools = MatchTools(session)
     persona = PERSONAS.get(profile.mode, PERSONAS["casual"]).format(
@@ -276,6 +303,11 @@ async def ask_agent(llm, question: str, session, profile, max_steps: int = 5) ->
     if orchestration.enabled(llm):
         def call_tool(name: str, args: dict) -> dict:
             steps.append(_step_label(name, args))
+            if on_step:
+                try:
+                    on_step("analyst", "looked up", _step_label(name, args))
+                except Exception as exc:  # the desk is a display; it must never break a tool call
+                    log.warning("agent desk update failed: %s", exc)
             return tools.run(name, args)
 
         text = await orchestration.run_match_analyst(llm, system, question, TOOLS, call_tool, max_steps)
@@ -299,6 +331,8 @@ async def ask_agent(llm, question: str, session, profile, max_steps: int = 5) ->
                 args = {}
             result = tools.run(call["name"], args)
             steps.append(_step_label(call["name"], args))
+            if on_step:
+                on_step("analyst", "looked up", steps[-1])
             messages.append({"role": "tool", "tool_call_id": call["id"],
                              "content": json.dumps(result, ensure_ascii=False)})
     else:
