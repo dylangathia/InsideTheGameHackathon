@@ -23,17 +23,17 @@ Microsoft Foundry (gpt-4.1-mini) writes the on-screen narration from computed fa
 - **Microsoft Foundry**, Azure OpenAI gpt-4.1-mini: grounded narration and recaps, plus the tool-calling "Ask the match" agent
 - **Microsoft Fabric** Real-Time Intelligence: Eventstream custom endpoint to an Eventhouse (KQL database) with live match events
 - **GitHub**: public repository, GitHub Actions CI (tests and front-end build)
-- **Azure Container Apps**: [delete this line if not deployed] containerised deployment from the included Dockerfile
+- **Azure Container Apps**: the live demo runs as a container on Azure Container Apps, built by GitHub Actions and published to GitHub Container Registry on every push to `main`
 
 ## Links
 
 - Code: https://github.com/dylangathia/InsideTheGameHackathon
 - Demo video: [YouTube/Vimeo link]
-- Live demo: [Azure Container Apps URL, or delete]
+- Live demo: https://footiemanager.lemonisland-55346052.eastus2.azurecontainerapps.io/
 
 ## Testing instructions
 
-**Live demo:** open [URL]. Pick a match at the top and press Play. Use **Split screen** to compare two viewers, and change each viewer's mode, language and club. Click **Sources** on any key moment. Type a question into **Ask the match**.
+**Live demo:** open https://footiemanager.lemonisland-55346052.eastus2.azurecontainerapps.io/. Pick a match at the top and press Play. Use **Split screen** to compare two viewers, and change each viewer's mode, language and club. Click **Sources** on any key moment. Type a question into **Ask the match**.
 
 **Run locally** (Python 3.11+, Node 20+):
 

@@ -6,7 +6,7 @@ The rules say the video must be **under 2 minutes** (judges can stop at 2:00), m
 
 - Start the app with Foundry and Fabric on. The badges at the top should say **Foundry on** and **Fabric on**.
 - Record at 1600 × 900 or larger, so overlay text is readable.
-- Open these links in separate tabs. Use the port your app runs on (8010 locally, or the Azure URL):
+- Open these links in separate tabs. Use the live Azure app (https://footiemanager.lemonisland-55346052.eastus2.azurecontainerapps.io) or your local one (port 8010):
   - **A (opening goal):** `/?scenario=comeback&t=400&speed=3`
   - **B (winner, then the agent):** `/?scenario=comeback&t=4105&speed=3`
   - **C (recap):** `/?scenario=comeback&t=5690&speed=5`

@@ -4,6 +4,8 @@ Our entry for the Microsoft × Premier League **Inside the Game** hackathon.
 
 FootieManager simulates a football match, works out what's happening as it happens, explains *why* the moments matter, and shows each viewer the match their own way. The same live intelligence reaches a data-hungry analyst and a casual fan as two different experiences, side by side, in several languages.
 
+**Live demo:** https://footiemanager.lemonisland-55346052.eastus2.azurecontainerapps.io/ (Azure Container Apps, running Microsoft Foundry and Fabric).
+
 Everything runs locally with no cloud setup. Microsoft Foundry (AI narration and Q&A) and Microsoft Fabric (live event store) switch on when you add credentials.
 
 ---
