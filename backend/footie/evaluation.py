@@ -13,6 +13,7 @@ import time
 from collections import Counter
 from datetime import datetime, timezone
 
+from .pipeline import orchestration
 from .pipeline.explain import Narrator
 from .pipeline.personalize import Profile
 from .pipeline.runner import MatchSession
@@ -48,7 +49,7 @@ async def evaluate(narrator: Narrator) -> dict:
             sid_, label_, ins_, prof_, draft = job
             out = await narrator.rewrite(ins_, prof_, session.ctx, draft)
             if out is None:
-                key = (ins_["id"], prof_.mode, prof_.language, prof_.club, prof_.player, prof_.metric)
+                key = narrator.cache_key(ins_, prof_, session.ctx)
                 rejected = [r for r in narrator.rejections if r["key"] == key and r["insight"] == ins_["id"]]
                 status = "rejected" if rejected else "error"
                 problems = rejected[-1]["problems"] + ["second draft: " + "; ".join(rejected[-1]["second"])] if rejected else []
@@ -60,7 +61,7 @@ async def evaluate(narrator: Narrator) -> dict:
 
         rows += await asyncio.gather(*[run(j) for j in jobs])
     return {"rows": rows, "seconds": round(time.time() - started), "model": narrator.llm.model,
-            "provider": narrator.llm.provider}
+            "provider": narrator.llm.provider, "agent_framework": orchestration.enabled(narrator.llm)}
 
 
 def report(result: dict) -> str:
@@ -75,7 +76,8 @@ def report(result: dict) -> str:
     lines = [
         "# Groundedness evaluation",
         "",
-        f"Run on {datetime.now(timezone.utc):%d %B %Y} with {result['provider']} ({result['model']}), "
+        f"Run on {datetime.now(timezone.utc):%d %B %Y} with {result['provider']} ({result['model']})"
+        f"{' on Microsoft Agent Framework (narrator -> verifier workflow)' if result.get('agent_framework') else ''}, "
         f"{total} AI narrations in {result['seconds']} s.",
         "Regenerate with `python cli.py evaluate` in `backend/`.",
         "",

@@ -16,6 +16,7 @@ import json
 import logging
 
 from ..i18n import tr
+from . import orchestration
 from .explain import PERSONAS, NameContext, _language_name, reasons
 
 log = logging.getLogger(__name__)
@@ -271,8 +272,16 @@ async def ask_agent(llm, question: str, session, profile, max_steps: int = 5) ->
         player=session.ctx.player(profile.player), metric=profile.metric or "speed")
     system = AGENT_PROMPT.format(minute=session.state()["minute"], language=_language_name(profile.language),
                                  persona=persona)
-    messages: list[dict] = [{"role": "system", "content": system}, {"role": "user", "content": question}]
     steps: list[str] = []
+    if orchestration.enabled(llm):
+        def call_tool(name: str, args: dict) -> dict:
+            steps.append(_step_label(name, args))
+            return tools.run(name, args)
+
+        text = await orchestration.run_match_analyst(llm, system, question, TOOLS, call_tool, max_steps)
+        return _finish(text, tools, steps, "agent_framework")
+
+    messages: list[dict] = [{"role": "system", "content": system}, {"role": "user", "content": question}]
     out = {"content": None, "tool_calls": []}
     for _ in range(max_steps):
         out = await llm.chat(messages, tools=TOOLS)
@@ -294,8 +303,10 @@ async def ask_agent(llm, question: str, session, profile, max_steps: int = 5) ->
                              "content": json.dumps(result, ensure_ascii=False)})
     else:
         out = await llm.chat(messages)  # step budget used up: answer with what it has
+    return _finish((out["content"] or "").strip(), tools, steps, "agent")
 
-    text = (out["content"] or "").strip()
+
+def _finish(text: str, tools: MatchTools, steps: list[str], source: str) -> dict:
     answer, cites = text, []
     start, end = text.find("{"), text.rfind("}")
     if start != -1 and end > start:
@@ -307,4 +318,4 @@ async def ask_agent(llm, question: str, session, profile, max_steps: int = 5) ->
             pass
     # Only keep citations the agent actually looked up, so a cite always points at real evidence.
     cites = [c for c in cites if c in tools.cited_ids]
-    return {"answer": answer, "cites": cites, "steps": steps, "source": "agent"}
+    return {"answer": answer, "cites": cites, "steps": steps, "source": source}

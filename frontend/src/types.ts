@@ -41,7 +41,8 @@ export interface Meta {
     period_ends: number[];
   };
   llm: boolean;
-  llm_provider: string | null; // "Foundry" or "GitHub Models"
+  llm_provider: string | null; // "Foundry", "Groq" or "OpenAI-compatible"
+  agent_framework?: boolean; // agents run on Microsoft Agent Framework
   fabric: boolean;
 }
 

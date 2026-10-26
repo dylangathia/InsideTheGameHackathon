@@ -32,6 +32,7 @@ from fastapi.staticfiles import StaticFiles
 load_dotenv()
 
 from footie.i18n import LANGUAGES, LLM_ONLY_LANGUAGES  # noqa: E402
+from footie.pipeline import orchestration  # noqa: E402
 from footie.pipeline.agent import ask_agent  # noqa: E402
 from footie.pipeline.explain import Narrator  # noqa: E402
 from footie.pipeline.ingest import FabricEventstreamSink  # noqa: E402
@@ -48,6 +49,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 NARRATOR = Narrator()
 LLM_PROVIDER = NARRATOR.llm.provider if NARRATOR.llm else None
+AGENT_FRAMEWORK = orchestration.enabled(NARRATOR.llm)
 FABRIC_ENABLED = bool(os.getenv("FABRIC_EVENTSTREAM_CONNECTION_STRING"))
 TICK = 0.1  # seconds of wall time per server tick
 
@@ -64,7 +66,8 @@ async def warm_cache() -> None:
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "llm": NARRATOR.enabled, "llm_provider": LLM_PROVIDER, "fabric": FABRIC_ENABLED}
+    return {"ok": True, "llm": NARRATOR.enabled, "llm_provider": LLM_PROVIDER, "agent_framework": AGENT_FRAMEWORK,
+            "fabric": FABRIC_ENABLED}
 
 
 @app.get("/api/scenarios")
@@ -107,6 +110,7 @@ def _meta_message(scenario: str, m) -> dict:
         "match": meta,
         "llm": NARRATOR.enabled,
         "llm_provider": LLM_PROVIDER,
+        "agent_framework": AGENT_FRAMEWORK,
         "fabric": FABRIC_ENABLED,
     }
 

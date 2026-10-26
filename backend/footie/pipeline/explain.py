@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 from ..i18n import LANGUAGES, LLM_ONLY_LANGUAGES, tr
 from ..llm import LLMClient
+from . import orchestration
 
 log = logging.getLogger(__name__)
 
@@ -415,9 +416,15 @@ class Narrator:
                if profile.club else "Stay neutral between the two clubs.")
         return SYSTEM_PROMPT.format(language=_language_name(profile.language), persona=persona, fan=fan)
 
+    @staticmethod
+    def cache_key(ins: dict, profile, ctx: NameContext) -> tuple:
+        """Moment ids restart in every match, so the key also names the match (its clubs) and the moment's time."""
+        return (ctx.team("home"), ctx.team("away"), ins["id"], ins["t"], ins["kind"],
+                profile.mode, profile.language, profile.club, profile.player, profile.metric)
+
     async def rewrite(self, ins: dict, profile, ctx: NameContext, draft: dict) -> dict | None:
         """Narrator agent writes, Verifier agent checks; one rewrite on failure, else keep the template."""
-        key = (ins["id"], profile.mode, profile.language, profile.club, profile.player, profile.metric)
+        key = self.cache_key(ins, profile, ctx)
         if key in self.cache:
             return self.cache[key]
         en_reasons = [tr("en", c, **p) for c, p in reasons(ins, ctx)]
@@ -431,6 +438,32 @@ class Narrator:
             "why_it_matters": en_reasons,
             "draft_in_english": draft if profile.language == "en" else None,
         }
+        if self.verify and orchestration.enabled(self.llm):
+            # Microsoft Agent Framework workflow: narrator -> verifier, one rewrite on failure.
+            outcome = await orchestration.narrate_and_verify(
+                payload,
+                lambda p: self._write(ins, profile, ctx, p),
+                lambda out: self.check(ins, profile, ctx, out, payload, draft),
+            )
+            if outcome.status == "failed":
+                return None
+            self.stats["checked"] += 1
+            if outcome.problems:
+                self.stats["failed_first"] += 1
+                log.info("Verifier rejected %s (%s): %s", ins["id"], profile.language, outcome.problems)
+            if outcome.status == "rejected":
+                self.stats["rejected"] += 1
+                self.rejections.append({"insight": ins["id"], "language": profile.language, "key": key,
+                                        "draft": outcome.out, "problems": outcome.problems, "second": outcome.second})
+                return None  # the template text stays on screen
+            out = outcome.out
+            verification = {"status": outcome.status, "orchestrator": "Microsoft Agent Framework"}
+            if outcome.problems:
+                verification["problems_fixed"] = outcome.problems
+            result = {**draft, "headline": out["headline"], "body": out.get("body", ""), "why": [], "source": "llm",
+                      "verification": verification}
+            self.cache[key] = result
+            return result
         out = await self._write(ins, profile, ctx, payload)
         if out is None:
             return None
@@ -458,9 +491,16 @@ class Narrator:
         self.cache[key] = result
         return result
 
+    async def _json(self, agent: str, system: str, user: str, max_tokens: int, temperature: float) -> dict:
+        """One agent turn returning JSON: an Agent Framework agent on Foundry, else the plain SDK."""
+        if orchestration.enabled(self.llm):
+            return await orchestration.run_json_agent(self.llm, agent, system, user, max_tokens, temperature)
+        return await self.llm.complete_json(system, user, max_tokens=max_tokens, temperature=temperature)
+
     async def _write(self, ins: dict, profile, ctx: NameContext, payload: dict) -> dict | None:
         try:
-            out = await self.llm.complete_json(self._system(profile, ctx), json.dumps(payload, ensure_ascii=False))
+            out = await self._json("narrator", self._system(profile, ctx), json.dumps(payload, ensure_ascii=False),
+                                   max_tokens=300, temperature=0.6)
         except Exception as exc:
             log.warning("LLM narration failed for %s: %s", ins["id"], exc)
             return None
@@ -488,8 +528,8 @@ class Narrator:
             "draft": {"headline": out.get("headline"), "body": out.get("body")},
         }
         try:
-            verdict = await self.llm.complete_json(VERIFIER_PROMPT, json.dumps(review, ensure_ascii=False),
-                                                   max_tokens=250, temperature=0.0)
+            verdict = await self._json("verifier", VERIFIER_PROMPT, json.dumps(review, ensure_ascii=False),
+                                       max_tokens=250, temperature=0.0)
         except Exception as exc:
             log.warning("Verifier unavailable for %s: %s", ins["id"], exc)
             return ["verifier unavailable"]  # never show unchecked AI text
