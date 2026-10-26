@@ -75,7 +75,7 @@ Other things the brief lists:
 | Grounded, auditable AI | **Sources** on every key moment shows the exact facts, reasons and match events the explanation (or the AI) was given; AI answers cite the moments they used |
 | Data innovation | our own match engine + tracking generator, dataset in [data/](data/), `python cli.py generate` for unlimited new matches |
 | Multi-language | English, Spanish, French, Swahili via templates (offline); Portuguese, Arabic and Hindi too when Foundry is on |
-| Personal modes | Analyst · Casual fan · Player focus · Single metric, plus favourite-club framing |
+| Personal modes | Analyst · Casual fan · Player focus · Single metric, plus favourite-club framing. **Player Cam** (in Player focus): the pitch follows the player with their trail, live speed, vision cone, the gap to the nearest opponent, and every pass option scored by difficulty |
 | Auto-eventing from video | **not built** (stretch goal; see "Next steps") |
 
 ---
