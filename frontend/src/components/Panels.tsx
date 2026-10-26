@@ -1,4 +1,5 @@
-import type { Club, MatchState, Overlay, PlayerStats, Side } from "../types";
+import { useState } from "react";
+import type { Club, Grounding, MatchState, Overlay, PlayerStats, Side } from "../types";
 import { METRICS } from "../types";
 
 const minuteOf = (label: string) => label.replace("'", "").split("+").reduce((a, b) => a + Number(b), 0);
@@ -206,24 +207,100 @@ export function Feed({ overlays, onReplay, title = "Live feed", limit = 60 }: {
               {o.text.headline}
             </li>
           ) : o.type === "recap" ? null : (
-            <li key={o.id} className={`feed-moment feed-${o.kind}`}>
-              <div className="feed-moment-head">
-                <span className="feed-min">{o.minute}</span>
-                <strong>{o.text.headline}</strong>
-                <button className="replay" onClick={() => onReplay(o.t)} title="Replay this moment">
-                  Replay
-                </button>
-              </div>
-              {o.text.body && <div className="feed-body">{o.text.body}</div>}
-              {o.text.why?.map((w, i) => (
-                <div key={i} className="feed-why">
-                  {w}
-                </div>
-              ))}
-            </li>
+            <Moment key={o.id} o={o} onReplay={onReplay} />
           ),
         )}
       </ol>
+    </div>
+  );
+}
+
+function Moment({ o, onReplay }: { o: Overlay; onReplay: (t: number) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className={`feed-moment feed-${o.kind}`}>
+      <div className="feed-moment-head">
+        <span className="feed-min">{o.minute}</span>
+        <strong>{o.text.headline}</strong>
+        {o.text.source === "llm" && <span className="ai-badge">AI</span>}
+        <span className="feed-actions">
+          {o.grounding && (
+            <button className="replay" onClick={() => setOpen(!open)} aria-expanded={open} title="Show what this is based on">
+              Sources
+            </button>
+          )}
+          <button className="replay" onClick={() => onReplay(o.t)} title="Replay this moment">
+            Replay
+          </button>
+        </span>
+      </div>
+      {o.text.body && <div className="feed-body">{o.text.body}</div>}
+      {o.text.why?.map((w, i) => (
+        <div key={i} className="feed-why">
+          {w}
+        </div>
+      ))}
+      {open && o.grounding && <Sources g={o.grounding} ai={o.text.source === "llm"} />}
+    </li>
+  );
+}
+
+const FACT_LABELS: Record<string, string> = {
+  xg: "xG",
+  speed_kmh: "Shot speed (km/h)",
+  distance_m: "Distance to goal (m)",
+  wp_before: "Win chance before (%)",
+  wp_after: "Win chance after (%)",
+  wp: "Win chance (%)",
+  seq_passes: "Passes in the move",
+  seq_seconds: "Move length (s)",
+  seq_travel_m: "Ground gained (m)",
+  minutes_left: "Minutes left",
+  scorer_goals: "Scorer's goals today",
+  score_before: "Score before",
+  score_after: "Score after",
+  index_before: "Index 5 min ago",
+  index_after: "Index now",
+  turnovers_pm: "Turnovers per minute",
+  completion_pct: "Pass completion (%)",
+  possession_pct: "Possession (%)",
+  pressures_pm: "Pressures per minute",
+  high_regains: "High ball wins (5 min)",
+  men_left: "Players left",
+};
+
+const label = (k: string) => FACT_LABELS[k] ?? k.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+
+/** The audit trail: the exact facts and reasons the explanation (or the AI) was given, plus the raw events. */
+function Sources({ g, ai }: { g: Grounding; ai: boolean }) {
+  return (
+    <div className="sources">
+      <div className="sources-head">{ai ? "What the AI was given" : "What this is based on"}</div>
+      <dl className="sources-facts">
+        {Object.entries(g.facts).map(([k, v]) => (
+          <div key={k}>
+            <dt>{label(k)}</dt>
+            <dd className="num">{String(v)}</dd>
+          </div>
+        ))}
+      </dl>
+      {ai && g.reasons.length > 0 && (
+        <ul className="sources-reasons">
+          {g.reasons.map((r, i) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
+      )}
+      {g.events.length > 0 && (
+        <div className="sources-events">
+          Match events:{" "}
+          {g.events.map((e) => (
+            <span key={e.id} className="num">
+              #{e.id} {e.minute} {e.type} · {e.player} {e.detail ? `(${e.detail})` : ""}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

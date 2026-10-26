@@ -336,7 +336,7 @@ class Narrator:
             "home": ctx.team("home"),
             "away": ctx.team("away"),
             "team": ctx.team(ins["side"]) if ins["side"] else None,
-            "facts": _readable_facts(ins["facts"], ctx),
+            "facts": readable_facts(ins["facts"], ctx),
             "why_it_matters": en_reasons,
             "draft_in_english": draft if profile.language == "en" else None,
         }
@@ -357,7 +357,7 @@ class Narrator:
         system = (
             "You answer questions about a football match that is in progress, for a broadcast companion app. "
             "Use only the match data provided. If the data does not answer the question, say so. "
-            "When you use a key moment, cite its id in square brackets, e.g. [i42]. "
+            "List the ids of the key moments you used in \"cites\". Do not put ids in the answer text. "
             f"Answer in {_language_name(profile.language)} for {PERSONAS.get(profile.mode, PERSONAS['casual']).format(player=ctx.player(profile.player), metric=profile.metric or 'speed')} "
             'Return JSON: {"answer": "<text>", "cites": ["<insight id>", ...]}'
         )
@@ -370,7 +370,8 @@ class Narrator:
             return {"answer": fallback_answer(question, context, ctx), "source": "rules", "cites": []}
 
 
-def _readable_facts(facts: dict, ctx: NameContext) -> dict:
+def readable_facts(facts: dict, ctx: NameContext) -> dict:
+    """The facts exactly as the model sees them: player ids resolved to names, internal fields dropped."""
     out = {}
     for k, v in facts.items():
         if k in ("scorer", "shooter", "assist", "player", "passer", "recipient") and isinstance(v, str):

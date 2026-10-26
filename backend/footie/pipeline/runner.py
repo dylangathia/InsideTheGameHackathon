@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from ..i18n import tr
 from ..sim.simulator import SimulatedMatch
-from .explain import NameContext, reasons
+from .explain import NameContext, readable_facts, reasons
 from .ingest import FabricEventstreamSink, MatchFeed
-from .interpret import MatchAnalyzer
+from .interpret import MatchAnalyzer, minute_label
 from .personalize import Profile, personalize
 from .render import to_overlay
 
@@ -25,6 +25,8 @@ class MatchSession:
         self.ctx = NameContext.from_match(match)
         self.insights: dict[str, dict] = {}
         self.overlays: list[dict] = []
+        self._events = {e["id"]: e for e in match.events}
+        self._grounding: dict[str, dict] = {}
 
     @property
     def t(self) -> float:
@@ -59,7 +61,38 @@ class MatchSession:
             self.advance_to(t)
 
     def personalize(self, ov: dict, profile: Profile) -> dict | None:
-        return personalize(ov, self.insights[ov["insight_id"]], profile, self.ctx, self.insights)
+        p = personalize(ov, self.insights[ov["insight_id"]], profile, self.ctx, self.insights)
+        if p and p["key"] and p["kind"] != "recap":
+            p["grounding"] = self.grounding(ov["insight_id"])
+        return p
+
+    def grounding(self, insight_id: str) -> dict:
+        """What a key moment rests on: the facts and reasons given to the model, and the raw events."""
+        if insight_id not in self._grounding:
+            ins = self.insights[insight_id]
+            facts = {}
+            for k, v in readable_facts(ins["facts"], self.ctx).items():
+                if isinstance(v, list) and len(v) == 2 and all(isinstance(x, int) for x in v):
+                    facts[k] = f"{v[0]}–{v[1]}"  # scorelines
+                elif v is not None and not isinstance(v, (dict, list)):
+                    facts[k] = v
+            self._grounding[insight_id] = {
+                "facts": facts,
+                "reasons": [tr("en", c, **p) for c, p in reasons(ins, self.ctx)],
+                "events": [self._event_summary(self._events[i]) for i in ins["evidence"] if i in self._events],
+            }
+        return self._grounding[insight_id]
+
+    def _event_summary(self, e: dict) -> dict:
+        detail = e.get("outcome") or e.get("card") or e.get("pass_type")
+        return {
+            "id": e["id"],
+            "minute": minute_label(e["period"], e["clock"]),
+            "type": e["type"],
+            "team": e["team"],
+            "player": self.ctx.full_names.get(e.get("player") or "", e.get("player")),
+            "detail": detail,
+        }
 
     def frame(self) -> dict | None:
         f = self.feed.frame_at(self.t)

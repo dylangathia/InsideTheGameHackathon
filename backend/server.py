@@ -192,7 +192,7 @@ class Connection:
             question = str(msg.get("question", ""))[:500]
             ctx = self.session.ask_context(prof)
             ans = await NARRATOR.answer(question, ctx, prof, self.session.ctx)
-            await self.send({"type": "answer", "viewer": vi, "question": question, **ans})
+            await self.send({"type": "answer", "viewer": vi, "question": question, "as_of": ctx["state"]["minute"], **ans})
         await self.status()
 
     async def reader(self) -> None:

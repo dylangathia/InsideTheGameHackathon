@@ -80,6 +80,13 @@ export interface Overlay {
   rows?: (string | number)[][];
   code?: string;
   receivedAt?: number; // client time the overlay arrived (live overlays only)
+  grounding?: Grounding; // key moments only: what the explanation rests on
+}
+
+export interface Grounding {
+  facts: Record<string, string | number | boolean>;
+  reasons: string[];
+  events: { id: number; minute: string; type: string; team: string; player: string | null; detail: string | null }[];
 }
 
 export interface TeamStats {
@@ -160,8 +167,9 @@ export interface MatchState {
 export interface Answer {
   question: string;
   answer: string;
-  cites: string[];
+  cites: string[]; // insight ids of the key moments the answer used
   source: string;
+  as_of?: string; // match minute the answer was based on
 }
 
 export interface Status {

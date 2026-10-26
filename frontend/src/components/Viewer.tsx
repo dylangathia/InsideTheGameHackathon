@@ -137,14 +137,37 @@ export function Viewer(props: Props) {
               <Feed overlays={overlays} onReplay={props.onReplay} title="Moments" />
             </>
           )}
-          <AskBox answers={props.answers} onAsk={props.onAsk} suggestions={SUGGESTIONS[profile.mode]} provider={meta.llm ? meta.llm_provider : null} />
+          <AskBox
+            answers={props.answers}
+            onAsk={props.onAsk}
+            suggestions={SUGGESTIONS[profile.mode]}
+            provider={meta.llm ? meta.llm_provider : null}
+            overlays={overlays}
+            onReplay={props.onReplay}
+          />
         </div>
       )}
     </section>
   );
 }
 
-function AskBox({ answers, onAsk, suggestions, provider }: { answers: Answer[]; onAsk: (q: string) => void; suggestions: string[]; provider: string | null }) {
+/** Moment ids belong in the citation chips, not the prose: drops "[i42]", "(i326, i482)" and bare "i42". */
+const stripIds = (text: string) =>
+  text
+    .replace(/\s*[[(]\s*i\d+(?:\s*[,;]\s*i\d+)*\s*[\])]/g, "")
+    .replace(/\s*i\d+/g, "")
+    .replace(/\s+([.,;:])/g, "$1");
+
+function AskBox({ answers, onAsk, suggestions, provider, overlays, onReplay }: {
+  answers: Answer[];
+  onAsk: (q: string) => void;
+  suggestions: string[];
+  provider: string | null;
+  overlays: Overlay[];
+  onReplay: (t: number) => void;
+}) {
+  // Cited moments, looked up from this viewer's own overlays so they read in the viewer's language.
+  const byInsight = new Map(overlays.filter((o) => o.key).map((o) => [o.insight_id, o]));
   const [q, setQ] = useState("");
   const submit = (text: string) => {
     if (!text.trim()) return;
@@ -178,9 +201,22 @@ function AskBox({ answers, onAsk, suggestions, provider }: { answers: Answer[]; 
           <li key={i}>
             <div className="q">{a.question}</div>
             <div className="a">
-              {a.answer}
+              {stripIds(a.answer)}
               {a.source === "llm" && <span className="ai-badge">AI</span>}
             </div>
+            {(a.cites.length > 0 || a.as_of) && (
+              <div className="cites">
+                {a.as_of && <span>Based on the match up to {a.as_of}</span>}
+                {a.cites
+                  .map((c) => byInsight.get(c))
+                  .filter((o): o is Overlay => !!o)
+                  .map((o) => (
+                    <button key={o.id} className="chip" onClick={() => onReplay(o.t)} title="Replay this moment">
+                      {o.minute} {o.text.headline}
+                    </button>
+                  ))}
+              </div>
+            )}
           </li>
         ))}
       </ol>
