@@ -3,13 +3,14 @@ import { useEffect, useState } from "react";
 const STAGES = [
   ["Ingest", "Synthetic match events and 5 Hz player tracking arrive as a live feed, and stream into Microsoft Fabric."],
   ["Interpret", "Stats, pass difficulty, ball and shot speed, sprints, xG, live win probability and three story indices."],
-  ["Explain", "Auditable reason codes say why a moment matters. Foundry writes it up, and a Verifier agent fact-checks it."],
+  ["Explain", "Auditable reason codes say why a moment matters. A Narrator agent writes it up and a Verifier agent fact-checks it, as a Microsoft Agent Framework workflow."],
   ["Render", "A timed, machine-readable overlay feed that any broadcast graphics engine can draw in sync."],
   ["Personalise", "Mode, language, favourite club and player turn the same intelligence into different experiences."],
 ];
 
 const TECH = [
-  ["Microsoft Foundry", "Narration, the Verifier agent and the Ask the match agent (gpt-4.1-mini)"],
+  ["Microsoft Agent Framework", "Three agents: Narrator and Verifier (a workflow with one rewrite loop) and the Ask the match analyst with six tools"],
+  ["Microsoft Foundry", "The model behind all three agents (gpt-4.1-mini)"],
   ["Microsoft Fabric", "Every event streams to an Eventhouse for live KQL queries"],
   ["Azure Container Apps", "This live app, deployed from GitHub Actions"],
   ["GitHub", "Public repo, CI on every push, container image builds"],

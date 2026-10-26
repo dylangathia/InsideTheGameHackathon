@@ -143,7 +143,7 @@ export function Viewer(props: Props) {
             answers={props.answers}
             onAsk={props.onAsk}
             suggestions={SUGGESTIONS[profile.mode]}
-            provider={meta.llm ? meta.llm_provider : null}
+            provider={meta.llm ? (meta.agent_framework ? `Agent Framework + ${meta.llm_provider}` : meta.llm_provider) : null}
             overlays={overlays}
             onReplay={props.onReplay}
           />
@@ -253,6 +253,11 @@ function AskBox({ answers, onAsk, suggestions, provider, overlays, onReplay }: {
             <div className="a">
               {stripIds(a.answer)}
               {(a.source === "llm" || a.source === "agent") && <span className="ai-badge">AI</span>}
+              {a.source === "agent_framework" && (
+                <span className="ai-badge" title="The match_analyst agent on Microsoft Agent Framework, using Microsoft Foundry">
+                  AI · Agent Framework
+                </span>
+              )}
             </div>
             {a.steps && a.steps.length > 0 && (
               <ol className="agent-steps" aria-label="What the agent looked up">

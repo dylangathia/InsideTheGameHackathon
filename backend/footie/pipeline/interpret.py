@@ -21,6 +21,7 @@ from ..football_models import (
     shot_geometry,
     win_probability,
 )
+from ..sim import history
 from ..sim.simulator import HALF, SimulatedMatch, other, to_frame
 
 WINDOW = 300.0      # 5 minutes of match time for the indices
@@ -105,6 +106,7 @@ class MatchAnalyzer:
         self.km_marks: dict[str, int] = {}
         self.speed_record = 0.0
         self.speed_record_last = -1e9
+        self.history = {pid: history.record(pid) for pid in self.side_of}  # season and career totals, kept live
 
         self._n = 0
         self.insights: list[dict] = []
@@ -226,6 +228,9 @@ class MatchAnalyzer:
     def _on_period_start(self, e, side, pid):
         if self.period == 1:
             self.ticker("tk_kickoff", None, [], [e["id"]])
+            for s in ("home", "away"):
+                for p in self.club(s).starters:
+                    self._appearance(p.id, [e["id"]])
         else:
             self.ticker("tk_second_half", None, [], [e["id"]])
 
@@ -319,6 +324,7 @@ class MatchAnalyzer:
         self.entered[pid] = self.t
         self.left[off] = self.t
         self.ticker("tk_sub", side, [pid, off], [e["id"]], player_in=pid, player_out=off)
+        self._appearance(pid, [e["id"]])
 
     def _on_card(self, e, side, pid):
         if e["card"] == "yellow":
@@ -397,6 +403,8 @@ class MatchAnalyzer:
         ps["goals"] += 1
         if assist:
             self.players[assist]["assists"] += 1
+        milestones = self._goal_milestones(pid)
+        assist_milestone = self._assist_milestone(assist) if assist else None
         self.goals_by[pid] = self.goals_by.get(pid, 0) + 1
         self.goal_list.append({"minute": self.label(), "player": pid, "side": side})
         self.wp = self._win_prob()
@@ -412,7 +420,56 @@ class MatchAnalyzer:
             "scorer_goals": self.goals_by[pid],
             "wp_before": self.wp_for(side, before),
             "wp_after": self.wp_for(side),
+            "milestones": milestones,
         }, evidence, key=True)
+        for m in milestones:
+            self._milestone(pid, m["code"], m["n"], evidence)
+        if assist_milestone:
+            self._milestone(assist, assist_milestone["code"], assist_milestone["n"], evidence)
+
+    # ------------------------------------------------------------------ milestones
+    def _milestone(self, pid: str, code: str, n: int, evidence: list[int]) -> dict:
+        rec = self.history[pid]
+        return self.insight("milestone", self.side_of[pid], [pid], 0.55, {
+            "player": pid, "code": code, "n": n, "season": history.SEASON,
+            "club_apps": rec.club_apps, "season_goals": rec.season_goals, "club_goals": rec.club_goals,
+            "career_goals": rec.career_goals, "season_assists": rec.season_assists,
+        }, evidence, key=True)
+
+    def _appearance(self, pid: str, evidence: list[int]) -> None:
+        rec = self.history[pid]
+        rec.club_apps += 1
+        rec.season_apps += 1
+        if rec.club_apps == 1:
+            self._milestone(pid, "debut", 1, evidence)
+        elif rec.club_apps >= 100 and rec.club_apps % 50 == 0:
+            self._milestone(pid, "club_apps", rec.club_apps, evidence)
+
+    def _goal_milestones(self, pid: str) -> list[dict]:
+        """Adds the goal to the scorer's totals and returns the milestones it reaches (at most two)."""
+        rec = self.history[pid]
+        rec.season_goals += 1
+        rec.club_goals += 1
+        rec.career_goals += 1
+        out = []
+        if rec.career_goals == 1:
+            out.append(("first_career_goal", 1))
+        elif rec.club_goals == 1:
+            out.append(("first_club_goal", 1))
+        if rec.career_goals > 1 and rec.career_goals % 50 == 0:
+            out.append(("career_goals", rec.career_goals))
+        if rec.club_goals == 25 or (rec.club_goals > 1 and rec.club_goals % 50 == 0):
+            out.append(("club_goals", rec.club_goals))
+        if rec.season_goals == 1 and rec.club_goals > 1:
+            out.append(("first_season_goal", 1))
+        if rec.season_goals in (10, 20, 30):
+            out.append(("season_goals", rec.season_goals))
+        return [{"code": c, "n": n} for c, n in out[:2]]
+
+    def _assist_milestone(self, pid: str) -> dict | None:
+        rec = self.history[pid]
+        rec.season_assists += 1
+        return {"code": "season_assists", "n": rec.season_assists} if rec.season_assists in (10, 20) else None
 
     def _momentum_for(self, side: str) -> int:
         """Momentum share (-100..100) from `side`'s point of view over 10 minutes."""

@@ -59,7 +59,7 @@ def select(ov: dict, profile: Profile) -> int | None:
         keep = kind not in ("sprint", "distance") or (kind == "distance" and m.get("km", 0) >= 10)
     elif profile.mode == "casual":
         keep = (
-            otype in ("key_moment", "recap")
+            otype in ("key_moment", "recap", "milestone")
             or (otype == "index_alert" and profile.club and ov["team"] is not None)
             or kind == "top_speed"
             or (kind == "difficult_pass" and m.get("difficulty", 0) >= 0.7)

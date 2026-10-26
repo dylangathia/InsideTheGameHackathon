@@ -99,3 +99,19 @@ def test_verifier_rejection_keeps_the_template():
     n = Narrator(llm=stub)
     assert asyncio.run(n.rewrite(goal, Profile(), s.ctx, _draft(s, goal, Profile()))) is None
     assert n.stats == {"checked": 1, "failed_first": 1, "rejected": 1}
+
+
+def test_cache_never_mixes_matches():
+    """Moment ids restart in every match: the same id in another match must get its own narration."""
+    from footie.sim.scenarios import load_match as lm
+    a = MatchSession(lm("comeback"))
+    a.advance_to(1200)
+    b = MatchSession(lm("red_card"))
+    b.run_to_end()
+    goal_a = next(i for i in a.insights.values() if i["kind"] == "goal")
+    other = dict(next(i for i in b.insights.values() if i["key"] and i["kind"] in Narrator.LLM_KINDS), id=goal_a["id"])
+    stub = StubLLM()
+    n = Narrator(llm=stub)
+    asyncio.run(n.rewrite(goal_a, Profile(), a.ctx, _draft(a, goal_a, Profile())))
+    asyncio.run(n.rewrite(other, Profile(), b.ctx, {"headline": "x", "sub": "", "body": "", "why": []}))
+    assert len(stub.calls) == 2

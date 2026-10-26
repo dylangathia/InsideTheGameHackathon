@@ -37,7 +37,12 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
       .slice(0, n);
 
   const lower = pick("key_moment", 1)[0];
-  const small = lower ? [] : [...pick("pass_card", 1), ...pick("shot_card", 1)].sort((a, b) => b.t - a.t).slice(0, 2);
+  const milestone = pick("milestone", 1);
+  // While a goal card is up, the scorer's milestone rides on top of it as a ribbon.
+  const ribbon = lower && milestone[0] && milestone[0].players.some((p) => lower.players.includes(p)) ? milestone[0] : undefined;
+  const small = lower
+    ? []
+    : [...milestone, ...[...pick("pass_card", 1), ...pick("shot_card", 1)].sort((a, b) => b.t - a.t)].slice(0, 2);
   const alert = pick("index_alert", 1)[0];
   const tags = pick("player_tag", 4);
   const panel = pick("stat_panel", 1)[0];
@@ -164,6 +169,7 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
         <div className={`lower lower-${lower.kind}`} key={lower.id}>
           <div className="lower-bar" style={{ background: lower.side ? meta.match[lower.side].primary : "#ffb547" }} />
           <div className="lower-main">
+            {ribbon && <div className="lower-ribbon">★ {ribbon.text.headline}</div>}
             <div className="lower-head">
               {lower.text.headline}
               {lower.text.sub && <span className="lower-sub">{lower.text.sub}</span>}
@@ -184,7 +190,8 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
       {!board && small.length > 0 && (
         <div className="smalls">
           {small.map((o) => (
-            <div className="small" key={o.id}>
+            <div className={`small small-${o.type}`} key={o.id}>
+              {o.type === "milestone" && <div className="small-kicker">{o.text.sub}</div>}
               <div className="small-head">{o.text.headline}</div>
               <div className="small-body">{o.text.body}</div>
             </div>
