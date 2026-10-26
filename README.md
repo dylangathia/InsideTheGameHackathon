@@ -32,7 +32,7 @@ The first start simulates the three demo matches and caches them in `backend/.ca
 
 **Docker:** `docker compose up --build`, then http://localhost:8000. This is the same container we'd deploy to Azure Container Apps or AKS, reading settings from `backend/.env`.
 
-**Tests:** `cd backend && python -m pytest -q` (20 tests: data realism, every pipeline stage, all four languages, personalisation, LLM layer with a stub).
+**Tests:** `cd backend && python -m pytest -q` (26 tests: data realism, every pipeline stage, all four languages, personalisation, LLM layer and the agent's tool loop with stubs).
 
 ### Using the app
 
@@ -68,6 +68,7 @@ Other things the brief lists:
 | Speed metrics | ball speed per pass, shot speed per shot (`shot_card`), player top speed |
 | Narratives, milestones, recaps | live commentary ticker, braces/hat-tricks, half-time and full-time recaps with turning point and standout player |
 | Explainability: control vs chaos, pressure, rhythm | three 0–100 indices, alerts when they shift, every claim backed by numbers |
+| Agentic AI | **Ask the match** is a tool-using agent on Microsoft Foundry: it chooses among six read-only tools over the live match (state, player stats, rankings, key moments, trends, raw event counts), shows each step it took, and only cites moments it actually looked up ([backend/footie/pipeline/agent.py](backend/footie/pipeline/agent.py)) |
 | Grounded, auditable AI | **Sources** on every key moment shows the exact facts, reasons and match events the explanation (or the AI) was given; AI answers cite the moments they used |
 | Data innovation | our own match engine + tracking generator, dataset in [data/](data/), `python cli.py generate` for unlimited new matches |
 | Multi-language | English, Spanish, French, Swahili via templates (offline); Portuguese, Arabic and Hindi too when Foundry is on |

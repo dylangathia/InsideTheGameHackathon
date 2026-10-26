@@ -32,6 +32,7 @@ from fastapi.staticfiles import StaticFiles
 load_dotenv()
 
 from footie.i18n import LANGUAGES, LLM_ONLY_LANGUAGES  # noqa: E402
+from footie.pipeline.agent import ask_agent  # noqa: E402
 from footie.pipeline.explain import Narrator  # noqa: E402
 from footie.pipeline.ingest import FabricEventstreamSink  # noqa: E402
 from footie.pipeline.personalize import METRICS, MODES, Profile  # noqa: E402
@@ -190,9 +191,16 @@ class Connection:
             vi = int(msg.get("viewer", 0))
             prof = self.viewers[vi] if vi < len(self.viewers) else Profile()
             question = str(msg.get("question", ""))[:500]
-            ctx = self.session.ask_context(prof)
-            ans = await NARRATOR.answer(question, ctx, prof, self.session.ctx)
-            await self.send({"type": "answer", "viewer": vi, "question": question, "as_of": ctx["state"]["minute"], **ans})
+            as_of = self.session.state()["minute"]
+            ans = None
+            if NARRATOR.enabled:
+                try:
+                    ans = await ask_agent(NARRATOR.llm, question, self.session, prof)
+                except Exception as exc:  # fall back to the single-shot answer below
+                    log.warning("agent failed, falling back: %s", exc)
+            if ans is None:
+                ans = await NARRATOR.answer(question, self.session.ask_context(prof), prof, self.session.ctx)
+            await self.send({"type": "answer", "viewer": vi, "question": question, "as_of": as_of, **ans})
         await self.status()
 
     async def reader(self) -> None:

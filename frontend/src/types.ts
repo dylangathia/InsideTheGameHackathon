@@ -170,6 +170,7 @@ export interface Answer {
   cites: string[]; // insight ids of the key moments the answer used
   source: string;
   as_of?: string; // match minute the answer was based on
+  steps?: string[]; // tool calls the agent made, e.g. "get_player_stats(Dembe)"
 }
 
 export interface Status {

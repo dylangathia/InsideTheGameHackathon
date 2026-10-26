@@ -178,7 +178,7 @@ function AskBox({ answers, onAsk, suggestions, provider, overlays, onReplay }: {
     <div className="card ask">
       <div className="card-head">
         <span>Ask the match</span>
-        <span className="hint">{provider ? `answered by AI (${provider}) from live data` : "rule-based answers (add AI keys in .env)"}</span>
+        <span className="hint">{provider ? `an AI agent (${provider}) that queries the live match` : "rule-based answers (add AI keys in .env)"}</span>
       </div>
       <form
         onSubmit={(e) => {
@@ -202,8 +202,18 @@ function AskBox({ answers, onAsk, suggestions, provider, overlays, onReplay }: {
             <div className="q">{a.question}</div>
             <div className="a">
               {stripIds(a.answer)}
-              {a.source === "llm" && <span className="ai-badge">AI</span>}
+              {(a.source === "llm" || a.source === "agent") && <span className="ai-badge">AI</span>}
             </div>
+            {a.steps && a.steps.length > 0 && (
+              <ol className="agent-steps" aria-label="What the agent looked up">
+                <span>Agent looked up:</span>
+                {a.steps.map((st, j) => (
+                  <li key={j} className="num">
+                    {st}
+                  </li>
+                ))}
+              </ol>
+            )}
             {(a.cites.length > 0 || a.as_of) && (
               <div className="cites">
                 {a.as_of && <span>Based on the match up to {a.as_of}</span>}

@@ -91,3 +91,32 @@ class LLMClient:
                 )
         text = resp.choices[0].message.content or "{}"
         return json.loads(text)
+
+    async def chat(self, messages: list[dict], tools: list[dict] | None = None, max_tokens: int = 500) -> dict:
+        """One chat turn that may request tool calls.
+
+        Returns {"content": str | None, "tool_calls": [{"id", "name", "arguments"}]}, with
+        arguments as the raw JSON string the model produced.
+        """
+        kwargs: dict = {"model": self.model, "messages": messages}
+        if tools:
+            kwargs["tools"] = tools
+        if self.reasoning:
+            kwargs.update(max_completion_tokens=max_tokens * 4, reasoning_effort="low")
+        else:
+            kwargs.update(max_tokens=max_tokens, temperature=0.2)
+        async with self.sem:
+            try:
+                resp = await self.client.chat.completions.create(**kwargs)
+            except Exception as exc:
+                if self.reasoning or ("max_tokens" not in str(exc) and "temperature" not in str(exc)):
+                    raise
+                kwargs.pop("max_tokens", None)
+                kwargs.pop("temperature", None)
+                resp = await self.client.chat.completions.create(**kwargs, max_completion_tokens=max_tokens * 4)
+        msg = resp.choices[0].message
+        calls = [
+            {"id": c.id, "name": c.function.name, "arguments": c.function.arguments or "{}"}
+            for c in (msg.tool_calls or [])
+        ]
+        return {"content": msg.content, "tool_calls": calls}
