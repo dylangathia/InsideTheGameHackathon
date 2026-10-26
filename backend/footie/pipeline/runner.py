@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from ..i18n import tr
 from ..sim.simulator import SimulatedMatch
+from . import breakdown as tactics
 from .explain import NameContext, readable_facts, reasons
 from .ingest import FabricEventstreamSink, MatchFeed
 from .interpret import MatchAnalyzer, minute_label
@@ -76,7 +77,11 @@ class MatchSession:
                     facts[k] = f"{v[0]}–{v[1]}"  # scorelines
                 elif v is not None and not isinstance(v, (dict, list)):
                     facts[k] = v
+            board = None
+            if ins["kind"] in ("goal", "big_chance") and ins["evidence"] and ins["evidence"][0] in self._events:
+                board = tactics.build(self.match, self._events[ins["evidence"][0]], ins["facts"].get("xg"))
             self._grounding[insight_id] = {
+                "breakdown": board,
                 "facts": facts,
                 "reasons": [tr("en", c, **p) for c, p in reasons(ins, self.ctx)],
                 "events": [self._event_summary(self._events[i]) for i in ins["evidence"] if i in self._events],

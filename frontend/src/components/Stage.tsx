@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { FrameBuffer } from "../useMatchStream";
-import type { Frame, MatchState, Meta, Overlay, Profile } from "../types";
+import type { Breakdown, Frame, MatchState, Meta, Overlay, Profile } from "../types";
 import { type Camera, FULL_VIEW, Pitch, toPct } from "./Pitch";
 
 interface Props {
@@ -11,6 +11,8 @@ interface Props {
   overlays: Overlay[];
   profile: Profile;
   replaying?: boolean;
+  board?: Breakdown | null;
+  onCloseBoard?: () => void;
 }
 
 /** Overlays stay on screen for `ttl` seconds of wall time after they arrive, so they stay readable at 10x. */
@@ -18,7 +20,7 @@ function isActive(o: Overlay, now: number) {
   return o.receivedAt !== undefined && now - o.receivedAt < o.ttl * 1000;
 }
 
-export function Stage({ meta, state, frame, frames, overlays, profile, replaying }: Props) {
+export function Stage({ meta, state, frame, frames, overlays, profile, replaying, board, onCloseBoard }: Props) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [camOn, setCamOn] = useState(true);
   const camera = useRef<Camera>({ ...FULL_VIEW });
@@ -61,7 +63,38 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
         favClub={profile.club}
         playerCam={playerCam}
         camera={camera}
+        board={board ?? null}
       />
+
+      {board && (
+        <aside className={`board-panel ${boardSide(board) === "left" ? "left" : ""}`} aria-label="Tactical breakdown">
+          <div className="board-kicker">Breakdown · {board.team}</div>
+          <div className="board-head">{board.headline}</div>
+          <ol className="board-steps">
+            {board.steps.map((st) => (
+              <li key={st.n} className={`board-step board-${st.kind}`}>
+                <span className="board-n">{st.n}</span>
+                <span>
+                  <strong>{st.label}</strong>
+                  {st.detail ? <em> · {st.detail}</em> : null}
+                  <span className="board-who">
+                    {st.player}
+                    {st.to ? ` → ${st.to}` : ""}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
+          {board.shape && (
+            <p className="board-shape">
+              <strong>{board.shape.team}</strong> ({board.shape.formation}) defending: back line {board.shape.back_line_m} m
+              from goal, {board.shape.box.defenders} defenders v {board.shape.box.attackers} attacker
+              {board.shape.box.attackers === 1 ? "" : "s"} in the box.
+            </p>
+          )}
+          <button onClick={onCloseBoard}>Close breakdown</button>
+        </aside>
+      )}
 
       {profile.mode === "player" && focusInfo && (
         <div className="cam-hud">
@@ -97,7 +130,7 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
         </div>
       )}
 
-      {tags.map((o) => {
+      {!board && tags.map((o) => {
         const pid = o.anchor.player_id;
         const p = pid ? positions.get(pid) : undefined;
         if (!p) return null;
@@ -111,7 +144,7 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
         );
       })}
 
-      {alert && (
+      {!board && alert && (
         <div className="alert" key={alert.id}>
           <div className="alert-kicker">{alert.minute}</div>
           <div className="alert-head">{alert.text.headline}</div>
@@ -127,7 +160,7 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
         </div>
       )}
 
-      {lower && (
+      {!board && lower && (
         <div className={`lower lower-${lower.kind}`} key={lower.id}>
           <div className="lower-bar" style={{ background: lower.side ? meta.match[lower.side].primary : "#ffb547" }} />
           <div className="lower-main">
@@ -148,7 +181,7 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
         </div>
       )}
 
-      {small.length > 0 && (
+      {!board && small.length > 0 && (
         <div className="smalls">
           {small.map((o) => (
             <div className="small" key={o.id}>
@@ -195,6 +228,13 @@ function StatRows({ rows, home, away }: { rows: (string | number)[][]; home: str
       </tbody>
     </table>
   );
+}
+
+/** The caption panel goes on the side away from the move, so it never covers the arrows. */
+export function boardSide(board: Breakdown): "left" | "right" {
+  const xs = board.steps.flatMap((st) => [st.x, st.end_x]).filter((v): v is number => v !== null);
+  const centre = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 52.5;
+  return centre > 52.5 ? "left" : "right";
 }
 
 export function AiBadge({ o }: { o: Overlay }) {

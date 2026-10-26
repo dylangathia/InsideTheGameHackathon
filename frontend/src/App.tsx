@@ -190,6 +190,10 @@ export default function App() {
               onProfile={(np) => setProfiles((ps) => ps.map((x, j) => (j === i ? np : x)))}
               onReplay={replay}
               onAsk={(q) => send({ type: "ask", viewer: i, question: q })}
+              onFreeze={(at) => {
+                send({ type: "seek", t: at });
+                send({ type: "control", action: "pause" });
+              }}
               layout={split ? "split" : "single"}
               replaying={!!replayInfo}
             />
