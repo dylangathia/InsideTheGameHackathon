@@ -1,0 +1,31 @@
+name: Container image
+
+# Builds the app image (API + front end) and publishes it to GitHub Container Registry,
+# where Azure Container Apps pulls it from: ghcr.io/<owner>/footiemanager:latest
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/footiemanager:latest
+            ghcr.io/${{ github.repository_owner }}/footiemanager:${{ github.sha }}
