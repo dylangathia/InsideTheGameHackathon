@@ -17,7 +17,8 @@ We entered **Best Multi-Agent System**, so each section is one agent at work.
   to you. Bad audio hurts more than no face at all.
 - **Voice-over:** the person on camera for a section also talks over its screen footage, so the voices stay
   consistent. Record the voice-over separately if that is easier, and lay it over the footage in editing.
-- **Name captions** the first time each person appears: name and role (e.g. "Dylan · built the agents").
+- **Presenters: Rico and Liz.** Dylan isn't on camera; he's credited on the closing card with the rest of the team.
+- **Name captions** the first time each person appears: name and role (e.g. "Rico · developer").
 
 ## Before recording the screen
 
@@ -41,13 +42,13 @@ Section cards are short full-screen titles (white on dark, 1 second) before each
 
 | Time | Section card | On camera (one line) | Screen | Voice-over over the screen |
 |---|---|---|---|---|
-| 0:00–0:08 | *FootieManager · Deep Dive* | **Dylan:** "We built a live match desk run by four AI agents. Let's show you how it works." | Tab A, split screen, match playing | (none, the line on camera covers it) |
+| 0:00–0:08 | *FootieManager · Deep Dive* | **Rico:** "We built a live match desk run by four AI agents. Let's show you how it works." | Tab A, split screen, match playing | (none, the line on camera covers it) |
 | 0:08–0:30 | **THE NARRATOR** | **Liz:** "Every goal gets explained, and differently for every fan." | Tab A: the 8' goal lands on both sides, the ★ ribbon "K. Thorne reaches 50 goals for Northbridge FC", the **AI · verified** text, then click **Sources** on the left | "Same goal, two viewers: an analyst on the left, a Riverside fan in Spanish on the right, told it's bad news. The Narrator writes from computed facts only, even Thorne's fiftieth goal for the club, and Sources shows exactly what it was given." |
-| 0:30–0:52 | **THE VERIFIER** | **Dylan:** "Nothing goes on air unchecked." | Tab B: the 67' goal, hold on the **Agent desk**: Narrator drafted "Breaks Deadlock" → Verifier flagged → Narrator rewrote → Verifier passed. Overlay card: **44 / 44 planted errors caught** | "Here the Narrator called it 'breaks the deadlock', but it was two-all. The Verifier caught it and sent it back, and only the fixed line aired. We tested it by planting 44 errors: it caught every one." |
+| 0:30–0:52 | **THE VERIFIER** | **Liz:** "Nothing goes on air unchecked." | Tab B: the 67' goal, hold on the **Agent desk**: Narrator drafted "Breaks Deadlock" → Verifier flagged → Narrator rewrote → Verifier passed. Overlay card: **44 / 44 planted errors caught** | "Here the Narrator called it 'breaks the deadlock', but it was two-all. The Verifier caught it and sent it back, and only the fixed line aired. We tested it by planting 44 errors: it caught every one." |
 | 0:52–1:07 | **ASK THE MATCH** | (no face) | Tab B: type "How did Riverside turn this around?" The desk shows the Analyst's lookups, then the answer and its steps | **Liz:** "Fans can ask the match anything. The Analyst agent picks which live-data tools to use, and shows its working." |
 | 1:07–1:37 | **THE HALF-TIME SHOW** | **Rico:** "I wanted those half-time breakdowns you get on TV, with the arrows." | Tab C: click **▶ Half-time show** on the desk; the desk shows the Pundit looking things up and the Verifier passing the script. Moment 1/3: arrows draw the move with the Pundit's caption. Press ▶ for moment 2 | **Rico:** "So the Pundit agent presents one. It only looks at the first half, picks the moments that decided it, and pulls each move's breakdown. Once the Verifier signs off, every pass and run is drawn on the pitch." |
-| 1:37–1:47 | **UNDER THE HOOD** | (no face) | Fabric KQL query, then click **How it works** in the app (the four agents and the Microsoft stack) | **Dylan:** "Four agents on Microsoft Agent Framework and Foundry, every event streaming into Fabric, running on Azure Container Apps." |
-| 1:47–1:55 | Closing card: *FootieManager* + repo link | **All three, together:** "FootieManager." | The app behind the end card | (none) |
+| 1:37–1:47 | **UNDER THE HOOD** | (no face) | Fabric KQL query, then click **How it works** in the app (the four agents and the Microsoft stack) | **Rico:** "Four agents on Microsoft Agent Framework and Foundry, every event streaming into Fabric, running on Azure Container Apps." |
+| 1:47–1:55 | Closing card: *FootieManager* + repo link + the team: Dylan, Rico, Liz | **Rico and Liz, together:** "FootieManager." | The app behind the end card | (none) |
 
 ## Tips
 
