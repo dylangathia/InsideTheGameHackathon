@@ -113,7 +113,10 @@ export interface Breakdown {
     back_line_players: number;
     lines: [number, number][][];
     box: { attackers: number; defenders: number };
+    text?: string; // the defending line, in the viewer's language
+    pill?: string; // the label drawn on the pitch, e.g. "Back line · 9 m from goal"
   } | null;
+  labels?: { kicker: string; close: string };
 }
 
 export interface Grounding {
@@ -228,6 +231,15 @@ export interface Show {
   closing: string;
   source: "llm" | "template";
   verification: string;
+  labels?: {
+    kicker: string;
+    pundit: string;
+    second_half: string;
+    back: string;
+    verified: string;
+    voice?: string;
+    voice_on?: string;
+  };
   receivedAt?: number;
 }
 
