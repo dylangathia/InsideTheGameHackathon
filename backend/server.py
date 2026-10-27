@@ -52,6 +52,8 @@ NARRATOR = Narrator()
 LLM_PROVIDER = NARRATOR.llm.provider if NARRATOR.llm else None
 AGENT_FRAMEWORK = orchestration.enabled(NARRATOR.llm)
 FABRIC_ENABLED = bool(os.getenv("FABRIC_EVENTSTREAM_CONNECTION_STRING"))
+# One Fabric connection for the whole server. A sink per session leaked a connection and a thread on every seek.
+FABRIC_SINK = FabricEventstreamSink.from_env()
 TICK = 0.1  # seconds of wall time per server tick
 
 
@@ -138,6 +140,13 @@ class Connection:
         async with self.lock:
             await self.ws.send_text(json.dumps(msg, ensure_ascii=False))
 
+    async def send_quietly(self, msg: dict) -> None:
+        """For background updates (the agent desk): the viewer may have left by the time they arrive."""
+        try:
+            await self.send(msg)
+        except Exception:
+            pass
+
     def spawn(self, coro) -> None:
         task = asyncio.create_task(coro)
         self.tasks.add(task)
@@ -164,7 +173,7 @@ class Connection:
 
         def send_step(agent: str, action: str, detail: str) -> None:
             self.desk_seq += 1
-            self.spawn(self.send({"type": "agent", "viewer": vi, "event": {
+            self.spawn(self.send_quietly({"type": "agent", "viewer": vi, "event": {
                 "seq": self.desk_seq, "agent": agent, "action": action, "detail": detail,
                 "minute": self.session.analyzer.label() if self.session else ""}}))
 
@@ -213,8 +222,9 @@ class Connection:
 
     async def reset_to(self, t: float) -> None:
         m = await _load(self.scenario)
-        session = MatchSession(m, FabricEventstreamSink.from_env())
+        session = MatchSession(m)  # catch up without the sink: those events were already streamed
         await run_in_threadpool(session.advance_to, max(0.0, t))
+        session.feed.sink = FABRIC_SINK  # from here on, new events stream to Fabric
         self.session = session
         await self.send_history()
         await self.send({"type": "state", "state": session.state()})
@@ -263,7 +273,7 @@ class Connection:
         self.speed = float(hello.get("speed", 10))
         m = await _load(self.scenario)
         await self.send(_meta_message(self.scenario, m))
-        self.session = MatchSession(m, FabricEventstreamSink.from_env())
+        self.session = MatchSession(m, FABRIC_SINK)
         await self.status()
         reader = asyncio.create_task(self.reader())
         n = 0
