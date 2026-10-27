@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FrameBuffer } from "../useMatchStream";
 import type { AgentEvent, Show, Answer, Frame, MatchState, Meta, Mode, Overlay, Profile } from "../types";
 import { LANGUAGES, LLM_LANGUAGES, METRICS, MODES } from "../types";
+import { speak, stopSpeaking, useVoice } from "../speech";
 import { AgentDesk } from "./AgentDesk";
 import { Feed, Indices, MetricTracker, Momentum, PlayerCard, StatsTable, WinChance, WinProbChart } from "./Panels";
 import { Stage } from "./Stage";
@@ -57,9 +58,13 @@ export function Viewer(props: Props) {
     setRun({ show, idx, resumeT });
   };
   const endShow = () => {
+    stopSpeaking();
     if (run) props.onFreeze(run.resumeT);
     setRun(null);
   };
+  // Optional: the Pundit's words read aloud, only where the browser has a voice for this language.
+  const voice = useVoice(profile.language);
+  const [voiceOn, setVoiceOn] = useState(false);
   useEffect(() => {
     if (!props.show) return;
     setShowPending(false);
@@ -68,13 +73,30 @@ export function Viewer(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.show]);
   useEffect(() => {
-    if (!run || run.idx >= run.show.segments.length) return;
-    const seg = run.show.segments[run.idx];
+    if (!run) return;
+    const seg = run.idx < run.show.segments.length ? run.show.segments[run.idx] : null;
+    const speaking = voiceOn && !!voice;
+    if (speaking) {
+      // Let the arrows start drawing, then the pundit talks; the next moment follows when the voice finishes.
+      // Each moment stays up at least 7 s, even if the speech engine fails or finishes instantly.
+      let next: ReturnType<typeof setTimeout> | undefined;
+      const shownAt = performance.now();
+      const start = setTimeout(() => speak(seg ? seg.talk : run.show.closing, voice!, () => {
+        const wait = Math.max(1500, 7000 - (performance.now() - shownAt));
+        if (seg) next = setTimeout(() => goTo(run.show, run.idx + 1, run.resumeT), wait);
+      }), 700);
+      return () => {
+        clearTimeout(start);
+        if (next) clearTimeout(next);
+        stopSpeaking();
+      };
+    }
+    if (!seg) return;
     const ms = 6000 + (seg.breakdown?.steps.length ?? 0) * 650 + seg.talk.split(" ").length * 120;
     const timer = setTimeout(() => goTo(run.show, run.idx + 1, run.resumeT), ms);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [run]);
+  }, [run, voiceOn]);
   const segment = run && run.idx < run.show.segments.length ? run.show.segments[run.idx] : null;
   const showView = run
     ? {
@@ -88,6 +110,7 @@ export function Viewer(props: Props) {
         onPrev: () => goTo(run.show, Math.max(0, run.idx - 1), run.resumeT),
         onNext: () => goTo(run.show, run.idx + 1, run.resumeT),
         onClose: endShow,
+        voice: voice ? { on: voiceOn, name: voice.name, toggle: () => setVoiceOn((v) => !v) } : null,
       }
     : null;
 

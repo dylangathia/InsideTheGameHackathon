@@ -26,6 +26,7 @@ export interface ShowView {
   minute: string;
   closing: string | null; // set on the final card
   ai: boolean;
+  voice: { on: boolean; name: string; toggle: () => void } | null; // null: no voice for this language
   onPrev: () => void;
   onNext: () => void;
   onClose: () => void;
@@ -39,6 +40,16 @@ function ShowControls({ show }: { show: ShowView }) {
         {Array.from({ length: show.total + 1 }, (_, i) => <i key={i} className={i === show.idx ? "on" : ""} />)}
       </span>
       {show.closing === null && <button onClick={show.onNext} aria-label="Next moment">▶</button>}
+      {show.voice && (
+        <button
+          className={`voice-btn ${show.voice.on ? "on" : ""}`}
+          onClick={show.voice.toggle}
+          aria-pressed={show.voice.on}
+          title={`The Pundit's words read aloud by your browser (${show.voice.name})`}
+        >
+          {show.voice.on ? "🔊 Voice on" : "🔈 Voice"}
+        </button>
+      )}
       <button onClick={show.onClose}>Back to the match</button>
     </div>
   );
