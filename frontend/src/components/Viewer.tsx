@@ -28,6 +28,14 @@ interface Props {
   replaying: boolean;
 }
 
+const SHOW_LABELS_EN = {
+  kicker: "Half-time show",
+  pundit: "Pundit",
+  second_half: "second half",
+  back: "Back to the match",
+  verified: "AI · verified",
+};
+
 const SUGGESTIONS: Record<Mode, string[]> = {
   analyst: ["Why did the momentum shift?", "Who leads on pressures?", "What's the xG?"],
   casual: ["What's the score?", "Who's been the best player?", "Why did that goal matter?"],
@@ -111,6 +119,7 @@ export function Viewer(props: Props) {
         onNext: () => goTo(run.show, run.idx + 1, run.resumeT),
         onClose: endShow,
         voice: voice ? { on: voiceOn, name: voice.name, toggle: () => setVoiceOn((v) => !v) } : null,
+        labels: run.show.labels ?? SHOW_LABELS_EN,
       }
     : null;
 

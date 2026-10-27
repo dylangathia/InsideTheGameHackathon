@@ -27,6 +27,7 @@ export interface ShowView {
   closing: string | null; // set on the final card
   ai: boolean;
   voice: { on: boolean; name: string; toggle: () => void } | null; // null: no voice for this language
+  labels: { kicker: string; pundit: string; second_half: string; back: string; verified: string; voice?: string; voice_on?: string };
   onPrev: () => void;
   onNext: () => void;
   onClose: () => void;
@@ -47,10 +48,10 @@ function ShowControls({ show }: { show: ShowView }) {
           aria-pressed={show.voice.on}
           title={`The Pundit's words read aloud by your browser (${show.voice.name})`}
         >
-          {show.voice.on ? "🔊 Voice on" : "🔈 Voice"}
+          {show.voice.on ? `🔊 ${show.labels.voice_on ?? "Voice on"}` : `🔈 ${show.labels.voice ?? "Voice"}`}
         </button>
       )}
-      <button onClick={show.onClose}>Back to the match</button>
+      <button onClick={show.onClose}>{show.labels.back}</button>
     </div>
   );
 }
@@ -116,15 +117,15 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
           {show && (
             <>
               <div className="board-kicker">
-                Half-time show · {show.idx + 1}/{show.total} · {show.minute}
+                {show.labels.kicker} · {show.idx + 1}/{show.total} · {show.minute}
               </div>
               <blockquote className="show-talk">
-                <span className="show-who">Pundit{show.ai ? " · AI · verified" : ""}</span>
+                <span className="show-who">{show.labels.pundit}{show.ai ? ` · ${show.labels.verified}` : ""}</span>
                 {show.talk}
               </blockquote>
             </>
           )}
-          {!show && <div className="board-kicker">Breakdown · {board.team}</div>}
+          {!show && <div className="board-kicker">{board.labels?.kicker ?? "Breakdown"} · {board.team}</div>}
           <div className="board-head">{board.headline}</div>
           <ol className="board-steps">
             {board.steps.map((st) => (
@@ -143,23 +144,29 @@ export function Stage({ meta, state, frame, frames, overlays, profile, replaying
           </ol>
           {board.shape && (
             <p className="board-shape">
-              <strong>{board.shape.team}</strong> ({board.shape.formation}) defending: back line {board.shape.back_line_m} m
-              from goal, {board.shape.box.defenders} defenders v {board.shape.box.attackers} attacker
-              {board.shape.box.attackers === 1 ? "" : "s"} in the box.
+              {board.shape.text ?? (
+                <>
+                  <strong>{board.shape.team}</strong> ({board.shape.formation}) defending: back line{" "}
+                  {board.shape.back_line_m} m from goal, {board.shape.box.defenders} defenders v{" "}
+                  {board.shape.box.attackers} attacker{board.shape.box.attackers === 1 ? "" : "s"} in the box.
+                </>
+              )}
             </p>
           )}
-          {show ? <ShowControls show={show} /> : <button onClick={onCloseBoard}>Close breakdown</button>}
+          {show ? <ShowControls show={show} /> : <button onClick={onCloseBoard}>{board.labels?.close ?? "Close breakdown"}</button>}
         </aside>
       )}
 
       {show && !board && (
         <div className="show-card" role="dialog" aria-label="Half-time show">
           <div className="board-kicker">
-            {show.closing !== null ? "Half-time show · second half" : `Half-time show · ${show.idx + 1}/${show.total} · ${show.minute}`}
+            {show.closing !== null
+              ? `${show.labels.kicker} · ${show.labels.second_half}`
+              : `${show.labels.kicker} · ${show.idx + 1}/${show.total} · ${show.minute}`}
           </div>
           <div className="board-head">{show.title}</div>
           <blockquote className="show-talk">
-            <span className="show-who">Pundit{show.ai ? " · AI · verified" : ""}</span>
+            <span className="show-who">{show.labels.pundit}{show.ai ? ` · ${show.labels.verified}` : ""}</span>
             {show.closing ?? show.talk}
           </blockquote>
           <ShowControls show={show} />

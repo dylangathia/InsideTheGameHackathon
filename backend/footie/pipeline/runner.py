@@ -64,12 +64,16 @@ class MatchSession:
     def personalize(self, ov: dict, profile: Profile) -> dict | None:
         p = personalize(ov, self.insights[ov["insight_id"]], profile, self.ctx, self.insights)
         if p and p["key"] and p["kind"] != "recap":
-            p["grounding"] = self.grounding(ov["insight_id"])
+            p["grounding"] = self.grounding(ov["insight_id"], profile.language)
         return p
 
-    def grounding(self, insight_id: str) -> dict:
-        """What a key moment rests on: the facts and reasons given to the model, and the raw events."""
-        if insight_id not in self._grounding:
+    def grounding(self, insight_id: str, lang: str = "en") -> dict:
+        """What a key moment rests on: the facts and reasons given to the model, and the raw events.
+
+        The breakdown board is drawn in the viewer's language; the facts stay as the model saw them.
+        """
+        key = (insight_id, lang)
+        if key not in self._grounding:
             ins = self.insights[insight_id]
             facts = {}
             for k, v in readable_facts(ins["facts"], self.ctx).items():
@@ -79,14 +83,14 @@ class MatchSession:
                     facts[k] = v
             board = None
             if ins["kind"] in ("goal", "big_chance") and ins["evidence"] and ins["evidence"][0] in self._events:
-                board = tactics.build(self.match, self._events[ins["evidence"][0]], ins["facts"].get("xg"))
-            self._grounding[insight_id] = {
+                board = tactics.build(self.match, self._events[ins["evidence"][0]], ins["facts"].get("xg"), lang)
+            self._grounding[key] = {
                 "breakdown": board,
                 "facts": facts,
                 "reasons": [tr("en", c, **p) for c, p in reasons(ins, self.ctx)],
                 "events": [self._event_summary(self._events[i]) for i in ins["evidence"] if i in self._events],
             }
-        return self._grounding[insight_id]
+        return self._grounding[key]
 
     def _event_summary(self, e: dict) -> dict:
         detail = e.get("outcome") or e.get("card") or e.get("pass_type")

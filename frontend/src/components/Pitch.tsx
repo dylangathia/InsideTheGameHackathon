@@ -179,7 +179,7 @@ export function Pitch({ frames, home, away, focusPlayer, favClub, playerCam, cam
           const back = board.shape.lines[0];
           if (back?.length) {
             const [bx, by] = back[0];
-            const label = `Back line · ${board.shape.back_line_m} m from goal`;
+            const label = board.shape.pill ?? `Back line · ${board.shape.back_line_m} m from goal`;
             labels.push(() => pill(ctx, X(bx), Y(by) + 2.4 * ms, label, "#cfd8e5", ms));
           }
         }

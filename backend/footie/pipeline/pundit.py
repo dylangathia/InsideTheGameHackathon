@@ -47,17 +47,18 @@ def _first_half_moments(session) -> list[dict]:
             if i["key"] and i["period"] == 1 and i["kind"] in ("goal", "big_chance")]
 
 
-def _assemble(session, show: dict, source: str, status: str) -> dict:
+def _assemble(session, show: dict, source: str, status: str, lang: str = "en") -> dict:
     segments = []
     for seg in show.get("segments", [])[:MAX_SEGMENTS]:
         ins = session.insights.get(str(seg.get("moment_id", "")))
         if not ins or not str(seg.get("talk", "")).strip():
             continue
         segments.append({"moment_id": ins["id"], "minute": ins["minute"], "kind": ins["kind"], "t": ins["t"],
-                         "talk": seg["talk"].strip(), "breakdown": session.grounding(ins["id"]).get("breakdown")})
+                         "talk": seg["talk"].strip(), "breakdown": session.grounding(ins["id"], lang).get("breakdown")})
     segments.sort(key=lambda s: s["t"])
+    labels = {k: tr(lang, f"show_{k}") for k in ("kicker", "pundit", "second_half", "back", "verified", "voice", "voice_on")}
     return {"title": show.get("title") or "", "segments": segments, "closing": show.get("closing") or "",
-            "source": source, "verification": status}
+            "source": source, "verification": status, "labels": labels}
 
 
 def template_show(session, profile) -> dict:
@@ -66,11 +67,11 @@ def template_show(session, profile) -> dict:
     picks = sorted(_first_half_moments(session), key=lambda i: i["importance"], reverse=True)[:MAX_SEGMENTS]
     segments = []
     for ins in picks:
-        board = session.grounding(ins["id"]).get("breakdown")
+        board = session.grounding(ins["id"], lang).get("breakdown")
         why = [tr(lang, c, **p) for c, p in reasons(ins, session.ctx)][:1]
         talk = " ".join(x for x in ([f"{board['headline']}."] if board else []) + why)
         segments.append({"moment_id": ins["id"], "talk": talk})
-    return _assemble(session, {"title": tr(lang, "recap_ht_h"), "segments": segments}, "template", "template")
+    return _assemble(session, {"title": tr(lang, "recap_ht_h"), "segments": segments}, "template", "template", lang)
 
 
 def _score(session) -> str:
@@ -145,7 +146,7 @@ async def build_show(llm, session, profile, on_step=None) -> dict:
 
     outcome = await orchestration.narrate_and_verify({"task": "Present the half-time show."}, write, check)
     if outcome.status in ("passed", "passed_after_rewrite") and outcome.out:
-        show = _assemble(session, outcome.out, "llm", outcome.status)
+        show = _assemble(session, outcome.out, "llm", outcome.status, profile.language)
         if show["segments"]:
             emit("pundit", "presenting", show["title"])
             show["trace"] = trace  # replayed on the agent desk when the cached show is shown again
